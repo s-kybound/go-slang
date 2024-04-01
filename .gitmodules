@@ -1,0 +1,3 @@
+[submodule "src/go-slang-parser"]
+	path = src/go-slang-parser
+	url = https://github.com/CS4215-AY2324S2-joy-kyriel/go-slang-parser.git
