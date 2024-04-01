@@ -110,4 +110,5 @@ export type Instr =
   | LDFInstr 
   | CALLInstr 
   | TCALLInstr 
-  | RESETInstr;
+  | RESETInstr
+  | LAUNCH_THREADInstr;
