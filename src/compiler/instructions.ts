@@ -16,7 +16,8 @@ export enum InstrType {
   LDF,
   CALL,
   TCALL,
-  RESET
+  RESET,
+  LAUNCH_THREAD,
 }
 
 export enum UnopType {
@@ -92,6 +93,8 @@ export interface TCALLInstr extends BaseInstr {
 }
 
 export interface RESETInstr extends BaseInstr {}
+
+export interface LAUNCH_THREADInstr extends BaseInstr {}
 
 export type Instr = 
   | LDCInstr 
