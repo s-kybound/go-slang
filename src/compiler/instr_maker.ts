@@ -2,7 +2,6 @@ import {
   InstrType,
   UnopType,
   BinopType,
-  Instr,
   LDCInstr,
   UNOPInstr,
   BINOPInstr,
