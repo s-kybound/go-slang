@@ -189,8 +189,8 @@ export class GoCompiler {
       comp.vals.forEach((val) => {
         this.compileFuncs[val.type](val);
         });
-      // then compile every name
-      comp.ids.forEach((id) => {
+      // then compile every name, in reverse
+      comp.ids.reverse().forEach((id) => {
         this.compileFuncs[id.type](id);
         });
       },
@@ -259,7 +259,7 @@ export class GoCompiler {
       // otherwise its just a function VALUE
       
       // compile the function as a literal
-      this.instrs[this.wc++] = makeLDFInstr(comp.formals, this.wc + 1);
+      this.instrs[this.wc++] = makeLDFInstr(comp.formals.map(c => c.name), this.wc + 1);
       const goto = makeGOTOInstr(0)
       this.instrs[this.wc++] = goto;
       // compile the function body

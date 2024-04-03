@@ -25,13 +25,14 @@ export class Environment {
 
   // get the value of a variable
   get(name: string): any {
-    if (this.bindings.has(name)) {
-      return this.bindings.get(name);
-    } else if (this.parent !== null) {
-      return this.parent.get(name);
-    } else {
-      throw new Error(`Variable ${name} not found`);
+    let e: Environment | null = this;
+    while (e !== null) {
+      if (e.bindings.has(name)) {
+        return e.bindings.get(name);
+      }
+      e = e.parent;
     }
+    throw new Error(`Variable ${name} not found`);
   }
 
   // set the value of a variable
@@ -41,8 +42,9 @@ export class Environment {
 
   // create a new environment with this environment as the parent
   extend(names: string[] = [], values: any[] = []): Environment {
+    console.log("Extending environment with", names, values);
     return new Environment(this, names, values);
   }
 }
 
-export const globalEnvironment = new Environment();
+export const globalEnvironment = new Environment(null, ["display"], [x => console.log(x)]);

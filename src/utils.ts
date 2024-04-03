@@ -4,11 +4,11 @@ export class Stack<T> {
     this.stack.push(value);
   }
   pop(): T {
-    const res = this.stack.pop()
-    if (res === undefined) {
+    if (this.stack.length === 0) {
       throw new Error("Stack is empty");
     }
-    return res;
+    const res = this.stack.pop()
+    return res as T;
   }
   isEmpty() {
     return this.stack.length === 0;

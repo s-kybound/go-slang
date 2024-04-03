@@ -11,15 +11,15 @@ func add(x, y number) number {
   return x + y;
 }
 
-func sub(x, y number) number {
-  return x - y;
+func give_three() (number, number, number) {
+  return 1, 2, 3;
 }
 
+func check(x, y, z number) {}
+
 func main() {
-  x := add(a, b);
-  y := sub(c, a);
-  display(x);
-  display(y);
+  x, y, z := give_three();
+  check(x, y, z);
 }
 `
 
@@ -30,8 +30,6 @@ const compiler = new GoCompiler(ast);
 compiler.compile();
 
 const instructions = compiler.getInstrs();
-
-console.log(instructions);
 
 const QUANTUM = 10;
 
