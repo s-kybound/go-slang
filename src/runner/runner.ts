@@ -9,7 +9,7 @@ export class Runner {
   // treated as a circular list of goroutines to run.
   private readonly goroutines: Goroutine[];
   private readonly programEnvironment = globalEnvironment.extend();
-  private readonly mainGoroutine: Goroutine = new NormalGoroutine(0, this, this.programEnvironment);
+  private readonly mainGoroutine: NormalGoroutine;
   private currGoroutine: number;
 
   // quantum of time to run each goroutine.
@@ -18,6 +18,7 @@ export class Runner {
   constructor(instructions: instr.Instr[], quantum: number) {
     this.instructions = instructions;
     this.quantum = quantum;
+    this.mainGoroutine = new NormalGoroutine(0, this, this.instructions, this.programEnvironment);
     this.goroutines = [this.mainGoroutine];
     this.currGoroutine = 0;
   }
@@ -31,7 +32,7 @@ export class Runner {
   }
 
   launchThread(pc: number, e: Environment) {
-    const newGoroutine = new NormalGoroutine(pc, this, e);
+    const newGoroutine = new NormalGoroutine(pc, this, this.instructions, e);
     this.goroutines.push(newGoroutine);
   }
 
@@ -62,5 +63,25 @@ export class Runner {
 
   isDeadlocked() {
     return !this.isDone() && this.goroutines.every(g => !g.isRunnable());
+  }
+
+  run(): any {
+    let time = 0;
+    while (!this.isDone()) {
+      if (this.isDeadlocked()) {
+        throw new Error("Deadlock detected!");
+      }
+      const currGoroutine = this.goroutines[this.currGoroutine];
+      currGoroutine.run();
+      time++;
+      if (time === this.quantum) {
+        time = 0;
+        this.cycleNext();
+      }
+    }
+    // display the final state of the program
+
+    console.log("Program finished running.");
+    //return this.mainGoroutine.getFinalValue();
   }
 }

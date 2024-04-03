@@ -25,7 +25,11 @@ import * as inst from "./instructions";
 
 import * as ast_type from "../go-slang-parser/src/parser_mapper/ast_types";
 
-class GoCompiler {
+interface CompileFuncs {
+  [key: string]: (comp: any) => void;
+}
+
+export class GoCompiler {
   private ast: ast_type.Program;
   private instrs: inst.Instr[];
   private compiled: boolean;
@@ -51,7 +55,8 @@ class GoCompiler {
     return [...this.instrs];
   }
 
-  compileProgram() {
+  public compileProgram() {
+    this.compileFuncs[this.ast.type](this.ast);
   }
 
   // a mapping of opcodes to their respective enum representations.
@@ -101,13 +106,17 @@ class GoCompiler {
   }
 
   // dictionary of compiler functions for each ast node type.
-  compileFuncs = {
+  compileFuncs: CompileFuncs = {
     program: (comp: ast_type.Program) => {
       // compile everything
       comp.top_declarations.forEach((decl) => {
-        this.compileFuncs[decl.declaration_type](decl);
+        this.compileFuncs[decl.type](decl);
         });
       // add a call to main()
+      // add a call to main()
+      this.instrs[this.wc++] = makeLDInstr("main");
+      this.instrs[this.wc++] = makeCALLInstr(0);
+      this.instrs[this.wc++] = makeDONEInstr();
       },
     identifier: (comp: ast_type.Identifier) => {
       this.instrs[this.wc++] = makeLDInstr(comp.name);

@@ -23,3 +23,7 @@ export class Closure {
     return this.params;
   }
 }
+
+export function isClosure(val: any): val is Closure {
+  return val instanceof Closure;
+}

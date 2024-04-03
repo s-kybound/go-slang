@@ -2,8 +2,9 @@ import * as instr from "../../compiler/instructions";
 import { Runner } from "../runner";
 import { Stack } from "../../utils";
 import { Environment } from "../env"; 
-import { Closure } from "../values/closure";
+import { Closure, isClosure } from "../values/closure";
 import { Frame, isCallFrame, makeBlockFrame, makeCallFrame } from "../runtime_stack_items";
+import { isBuiltin } from "../values/builtin";
 
 export interface Goroutine {
   isDone(): boolean;
@@ -22,9 +23,9 @@ export class NormalGoroutine implements Goroutine {
   private done: boolean = false;
   private blocked: boolean = false;
 
-  constructor(programCounter: number, runner: Runner, environment: Environment) {
+  constructor(programCounter: number, runner: Runner, inst:instr.Instr[], environment: Environment) {
     this.runner = runner;
-    this.instructions = runner.getInstructions();
+    this.instructions = inst;
     this.runtimeStack = new Stack();
     this.operandStack = new Stack();
     this.programCounter = programCounter;
@@ -111,15 +112,28 @@ export class NormalGoroutine implements Goroutine {
       case instr.InstrType.CALL:
       case instr.InstrType.TCALL:
         const arity = (i as instr.CALLInstr).arity;
+        
         let args: any[] = [];
         for (let i = arity - 1; i >= 0; i--) {
           args[i] = this.operandStack.pop();
         }
-        const fn = this.operandStack.pop() as Closure;
+        
+        const fn = this.operandStack.pop();
+        if (isBuiltin(fn)) {
+          const res = fn.apply(args);
+          this.operandStack.push(res);
+          this.programCounter++;
+          return;
+        }
+        if (!isClosure(fn)) {
+          throw new Error("Expected a closure");
+        }
+        
         if (i.type === instr.InstrType.CALL) {
           // push onto runtime stack
           this.runtimeStack.push(makeCallFrame(this.environment, this.programCounter + 1));
         }
+
         this.environment = fn.getEnv().extend(fn.getParams(), args);
         this.programCounter = fn.getPC();
         break;
@@ -188,7 +202,15 @@ export class NormalGoroutine implements Goroutine {
     if (this.done) {
       return;
     }
+    console.log(this.instructions);
     const instr = this.instructions[this.programCounter];
     this.executeInstruction(instr);
+  }
+
+  getFinalValue() {
+    if (!this.done) {
+      throw new Error("Goroutine not done yet");
+    }
+    return this.operandStack.pop();
   }
 }
