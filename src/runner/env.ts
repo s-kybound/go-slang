@@ -8,8 +8,11 @@ export class Environment {
   private parent: Environment | null = null;
   private bindings: Map<string, any> = new Map();
 
-  constructor(parent: Environment | null = null) {
+  constructor(parent: Environment | null = null, names: string[] = [], values: any[] = []) {
     this.parent = parent;
+    for (let i = 0; i < names.length; i++) {
+      this.bindings.set(names[i], values[i]);
+    }
   }
 
   getParent(): Environment {
@@ -37,8 +40,8 @@ export class Environment {
   }
 
   // create a new environment with this environment as the parent
-  extend(): Environment {
-    return new Environment(this);
+  extend(names: string[] = [], values: any[] = []): Environment {
+    return new Environment(this, names, values);
   }
 }
 

@@ -3,6 +3,7 @@ import { Runner } from "../runner";
 import { Stack } from "../../utils";
 import { Environment } from "../env"; 
 import { Closure } from "../values/closure";
+import { Frame, isCallFrame, makeBlockFrame, makeCallFrame } from "../runtime_stack_items";
 
 export interface Goroutine {
   isDone(): boolean;
@@ -15,7 +16,7 @@ export class NormalGoroutine implements Goroutine {
   private programCounter: number = 0;
   readonly runner: Runner;
   readonly instructions: instr.Instr[];
-  readonly runtimeStack: Stack<any>;
+  readonly runtimeStack: Stack<Frame>;
   readonly operandStack: Stack<any>;
   private environment: Environment;
   private done: boolean = false;
@@ -76,11 +77,14 @@ export class NormalGoroutine implements Goroutine {
         break;
       case instr.InstrType.ENTER_SCOPE:
         // make a new scope
+        this.runtimeStack.push(makeBlockFrame(this.environment));
         this.environment = this.environment.extend();
         this.programCounter++;
         break;
       case instr.InstrType.EXIT_SCOPE:
-        this.environment = this.environment.getParent();
+        // pop the old scope
+        const oldFrame = this.runtimeStack.pop();
+        this.environment = oldFrame.env;
         this.programCounter++;
         break;
       case instr.InstrType.LD:
@@ -105,20 +109,29 @@ export class NormalGoroutine implements Goroutine {
         this.programCounter++;
         break;
       case instr.InstrType.CALL:
+      case instr.InstrType.TCALL:
         const arity = (i as instr.CALLInstr).arity;
         let args: any[] = [];
-        for (let i = 0; i < arity; i++) {
-          args.push(this.operandStack.pop());
+        for (let i = arity - 1; i >= 0; i--) {
+          args[i] = this.operandStack.pop();
         }
-        this.programCounter++;
-        break;
-      case instr.InstrType.TCALL:
-        // todo
-        this.programCounter++;
+        const fn = this.operandStack.pop() as Closure;
+        if (i.type === instr.InstrType.CALL) {
+          // push onto runtime stack
+          this.runtimeStack.push(makeCallFrame(this.environment, this.programCounter + 1));
+        }
+        this.environment = fn.getEnv().extend(fn.getParams(), args);
+        this.programCounter = fn.getPC();
         break;
       case instr.InstrType.RESET:
-        // todo
-        break
+        // pop from runtime stack until we find a call frame
+        let frame = this.runtimeStack.pop();
+        while (!isCallFrame(frame)) {
+          frame = this.runtimeStack.pop();
+        }
+        this.environment = frame.env;
+        this.programCounter = frame.pc;
+        break;
       case instr.InstrType.LAUNCH_THREAD:
         // launch a new thread with wc + 1
         this.runner.launchThread(this.programCounter + 1, this.environment);
