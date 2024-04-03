@@ -44,7 +44,6 @@ export class Environment {
 
   // create a new environment with this environment as the parent
   extend(names: string[] = [], values: any[] = []): Environment {
-    console.log("Extending environment with", names, values);
     return new Environment(this, names, values);
   }
 }

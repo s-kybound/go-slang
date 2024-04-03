@@ -55,7 +55,7 @@ export class Runner {
       }
       // we have landed on a runnable goroutine.
       string += this.currGoroutine;
-      console.log(string);
+      //console.log(string);
       break;
     }
   }
@@ -85,6 +85,6 @@ export class Runner {
     // display the final state of the program
 
     console.log("Program finished running.");
-    //return this.mainGoroutine.getFinalValue();
+    return this.mainGoroutine.getFinalValue();
   }
 }

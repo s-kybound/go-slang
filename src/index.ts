@@ -21,11 +21,39 @@ func check(x, y, z number) {
   display(z);
 }
 
+func async1() {
+  display("async1 running:");
+  for x := 0; x < 10000; x = x + 1 {
+    display(x);
+  }
+  display("async1 done");
+}
+
+func async2() {
+  display("async2 running:");
+  for x := 10000; x < 20000; x = x + 1 {
+    display(x);
+  }
+  display("async2 done");
+}
+
 func main() {
+  /*func inner() {
+    display("hello");
+  }
   x, y, z := 1, 2, 3;
   check(x, y, z);
   x, y, z = give_three();
   check(x, y, z);
+  check(a, b, c);
+  inner();*/
+  go async1();
+  go async2();
+  display("main running:");
+  display("7");
+  display("8");
+  display("9");
+  display("main done");
 }
 `
 
@@ -37,7 +65,7 @@ compiler.compile();
 
 const instructions = compiler.getInstrs();
 
-const QUANTUM = 10;
+const QUANTUM = 22;
 
 const runner = new Runner(instructions, QUANTUM);
 

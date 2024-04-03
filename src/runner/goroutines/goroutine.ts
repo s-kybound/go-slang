@@ -72,6 +72,7 @@ export class NormalGoroutine implements Goroutine {
         if (!condition) {
           this.programCounter = (i as instr.JOFInstr).addr;
         }
+        this.programCounter++;
         break;
       case instr.InstrType.GOTO:
         this.programCounter = (i as instr.GOTOInstr).addr;
