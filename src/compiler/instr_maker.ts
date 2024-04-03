@@ -16,7 +16,8 @@ import {
   CALLInstr,
   TCALLInstr,
   RESETInstr,
-  LAUNCH_THREADInstr
+  LAUNCH_THREADInstr,
+  DONEInstr
 } from "./instructions"
 
 export function makeLDCInstr(value: any): LDCInstr {
@@ -75,6 +76,10 @@ export function makeRESETInstr(): RESETInstr {
   return { type: InstrType.RESET }
 }
 
-export function makeLAUNCH_THREADInstr(): LAUNCH_THREADInstr {
-  return { type: InstrType.LAUNCH_THREAD }
+export function makeLAUNCH_THREADInstr(addr: number): LAUNCH_THREADInstr {
+  return { type: InstrType.LAUNCH_THREAD, addr: addr }
+}
+
+export function makeDONEInstr(): DONEInstr {
+  return { type: InstrType.DONE }
 }

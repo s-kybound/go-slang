@@ -18,6 +18,7 @@ import {
   makeTCALLInstr,
   makeRESETInstr,
   makeLAUNCH_THREADInstr,
+  makeDONEInstr
 } from "./instr_maker";
 
 import * as inst from "./instructions";
@@ -184,9 +185,66 @@ class GoCompiler {
         this.compileFuncs[id.type](id);
         });
       },
-    ifStatement: undefined,
-    forStatement: undefined,
-    goStatement: undefined,
+    ifStatement: (comp: ast_type.IfStatement) => {
+      // first create a new scope
+      this.instrs[this.wc++] = makeENTER_SCOPEInstr();
+      if (comp.short !== null) {
+        this.compileFuncs[comp.short.type](comp.short);
+      }
+      this.compileFuncs[comp.cond.type](comp.cond);
+      const jof = makeJOFInstr(0);
+      this.instrs[this.wc++] = jof;
+      comp.cons.forEach((stmt) => {
+        this.compileFuncs[stmt.type](stmt);
+        });
+      const goto = makeGOTOInstr(0);
+      this.instrs[this.wc++] = goto;
+      jof.addr = this.wc;
+      if (comp.alt !== null) {
+        comp.alt.forEach((stmt) => {
+          this.compileFuncs[stmt.type](stmt);
+          });
+        }
+      goto.addr = this.wc;
+    },
+    forStatement: (comp: ast_type.ForStatement) => {
+      // first create a new scope
+      this.instrs[this.wc++] = makeENTER_SCOPEInstr();
+      // compile the initializer
+      if (comp.init !== null) {
+        this.compileFuncs[comp.init.type](comp.init);
+        }
+      const start = this.wc;
+      const jof = makeJOFInstr(0);
+      // compile the condition
+      if (comp.cond !== null) {
+        this.compileFuncs[comp.cond.type](comp.cond);
+        this.instrs[this.wc++] = jof;
+      }
+      // compile the body
+      comp.body.forEach((stmt) => {
+        this.compileFuncs[stmt.type](stmt);
+        });
+      // compile the post
+      if (comp.post !== null) {
+        this.compileFuncs[comp.post.type](comp.post);
+        }
+      this.instrs[this.wc++] = makeGOTOInstr(start);
+      jof.addr = this.wc;
+      // exit the scope
+      this.instrs[this.wc++] = makeEXIT_SCOPEInstr();
+    },
+    goStatement: (comp: ast_type.GoStatement) => {
+      // LAUNCH_THREAD creates a new thread using a "syscall"
+      // that starts at wc + 1
+      const launch = makeLAUNCH_THREADInstr(0);
+      this.instrs[this.wc++] = launch;
+      // compile the function
+      this.compileFuncs[comp.app.type](comp.app);
+      this.instrs[this.wc++] = makeDONEInstr();
+      // set the launch instruction
+      launch.addr = this.wc;
+    },
     function: (comp: ast_type.FunctionNode) => {
       // this one does double work - if we have a function name, we need to assign it
       // otherwise its just a function VALUE

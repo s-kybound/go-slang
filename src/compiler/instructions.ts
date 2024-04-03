@@ -18,6 +18,7 @@ export enum InstrType {
   TCALL,
   RESET,
   LAUNCH_THREAD,
+  DONE
 }
 
 export enum UnopType {
@@ -94,7 +95,11 @@ export interface TCALLInstr extends BaseInstr {
 
 export interface RESETInstr extends BaseInstr {}
 
-export interface LAUNCH_THREADInstr extends BaseInstr {}
+export interface LAUNCH_THREADInstr extends BaseInstr {
+  addr: number;
+}
+
+export interface DONEInstr extends BaseInstr {}
 
 export type Instr = 
   | LDCInstr 
@@ -111,4 +116,5 @@ export type Instr =
   | CALLInstr 
   | TCALLInstr 
   | RESETInstr
-  | LAUNCH_THREADInstr;
+  | LAUNCH_THREADInstr
+  | DONEInstr;
