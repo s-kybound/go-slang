@@ -38,6 +38,7 @@ export class Runner {
 
   // move to the next available goroutine.
   cycleNext() {
+    let string = "context switching from: " + this.currGoroutine + " to ";
     while (true) {
       this.currGoroutine = (this.currGoroutine + 1) % this.goroutines.length;
       if (this.goroutines[this.currGoroutine].isDone() && this.currGoroutine !== 0) {
@@ -53,6 +54,8 @@ export class Runner {
         continue;
       }
       // we have landed on a runnable goroutine.
+      string += this.currGoroutine;
+      console.log(string);
       break;
     }
   }

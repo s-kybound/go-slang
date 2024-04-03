@@ -4,6 +4,8 @@
 // the global environment has no parent
 // the global environment is created when the program starts
 
+import { Builtin } from "./values/builtin";
+
 export class Environment {
   private parent: Environment | null = null;
   private bindings: Map<string, any> = new Map();
@@ -47,4 +49,4 @@ export class Environment {
   }
 }
 
-export const globalEnvironment = new Environment(null, ["display"], [x => console.log(x)]);
+export const globalEnvironment = new Environment(null, ["display"], [new Builtin((x: any) => console.log(x))]);

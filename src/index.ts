@@ -12,13 +12,19 @@ func add(x, y number) number {
 }
 
 func give_three() (number, number, number) {
-  return 1, 2, 3;
+  return 4, 5, 6;
 }
 
-func check(x, y, z number) {}
+func check(x, y, z number) {
+  display(x);
+  display(y);
+  display(z);
+}
 
 func main() {
-  x, y, z := give_three();
+  x, y, z := 1, 2, 3;
+  check(x, y, z);
+  x, y, z = give_three();
   check(x, y, z);
 }
 `

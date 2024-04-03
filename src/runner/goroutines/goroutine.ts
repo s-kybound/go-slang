@@ -204,10 +204,10 @@ export class NormalGoroutine implements Goroutine {
     }
     const instr = this.instructions[this.programCounter];
     try {
-      console.log("before: ", this.operandStack)
-      console.log(instr);
+      //console.log("before: ", this.operandStack)
+      //console.log(instr);
       this.executeInstruction(instr);
-      console.log("after: ", this.operandStack)
+      //console.log("after: ", this.operandStack)
     } catch (e) {
       // display the current stack trace
       throw e;

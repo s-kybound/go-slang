@@ -148,7 +148,7 @@ export class GoCompiler {
         this.compileFuncs[val.type](val);
         });
       // then compile every name
-      comp.ids.forEach((id) => {
+      comp.ids.reverse().forEach((id) => {
         this.instrs[this.wc++] = makeASSIGNInstr(id.name);
         });
       },
@@ -191,7 +191,7 @@ export class GoCompiler {
         });
       // then compile every name, in reverse
       comp.ids.reverse().forEach((id) => {
-        this.compileFuncs[id.type](id);
+        this.instrs[this.wc++] = makeASSIGNInstr(id.name);
         });
       },
     ifStatement: (comp: ast_type.IfStatement) => {
