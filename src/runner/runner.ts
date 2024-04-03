@@ -39,9 +39,28 @@ export class Runner {
   cycleNext() {
     while (true) {
       this.currGoroutine = (this.currGoroutine + 1) % this.goroutines.length;
-      if (!this.goroutines[this.currGoroutine].isRunnable()) {
-        break;
+      if (this.goroutines[this.currGoroutine].isDone() && this.currGoroutine !== 0) {
+        // clean up the goroutine
+        this.goroutines.splice(this.currGoroutine, 1);
+        // check if currGoroutine now points to an invalid index - ie the last goroutine was removed.
+        if (this.currGoroutine >= this.goroutines.length) {
+          this.currGoroutine = 0;
+        }
+        continue;
       }
+      if (this.goroutines[this.currGoroutine].isBlocked()) {
+        continue;
+      }
+      // we have landed on a runnable goroutine.
+      break;
     }
+  }
+
+  isDone() {
+    return this.goroutines.every(g => g.isDone());
+  }
+
+  isDeadlocked() {
+    return !this.isDone() && this.goroutines.every(g => !g.isRunnable());
   }
 }
