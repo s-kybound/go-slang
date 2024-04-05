@@ -4,6 +4,7 @@
 // the global environment has no parent
 // the global environment is created when the program starts
 
+import { Value } from "../types";
 import { Builtin } from "./values/builtin";
 
 export class Environment {
@@ -38,7 +39,7 @@ export class Environment {
   }
 
   // set the value of a variable
-  set(name: string, value: any): void {
+  set(name: string, value: Value): void {
     this.bindings.set(name, value);
   }
 

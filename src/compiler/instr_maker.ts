@@ -1,3 +1,4 @@
+import { Value } from "../types"
 import {
   InstrType,
   UnopType,
@@ -20,7 +21,7 @@ import {
   DONEInstr
 } from "./instructions"
 
-export function makeLDCInstr(value: any): LDCInstr {
+export function makeLDCInstr(value: Value): LDCInstr {
   return { type: InstrType.LDC, value: value }
 }
 
