@@ -2,12 +2,14 @@ import * as es from "estree";
 import { GoNode } from "./go-slang-parser/src/parser_mapper/ast_types";
 import { Environment } from "./runner/env";
 
-
-export interface Frame {
-    [name: string]: any
-}
-
 export type Value = any;
+
+export interface CustomBuiltIns {
+    rawDisplay: (value: Value, str: string, externalContext: any) => Value;
+    prompt: (value: Value, str: string, externalContext: any) => string | null;
+    alert: (value: Value, str: string, externalContext: any) => void;
+    visualiseList: (list: any, externalContext: any) => void;
+}
 
 export enum ErrorType {
     IMPORT = 'Import',
@@ -51,14 +53,21 @@ export interface Context<T = any> {
     prelude: string | null
 
     /** the state of the debugger */
-    debugger: {
-        /** External observers watching this context */
-        status: boolean
-        state: {
-            it: IterableIterator<T>
-            scheduler: Scheduler
-        }
-    }
+    // debugger: {
+    //     /** External observers watching this context */
+    //     status: boolean
+    //     state: {
+    //         it: IterableIterator<T>
+    //         scheduler: Scheduler
+    //     }
+    // }
+    
+    /**
+     * Used for storing external properties.
+     * For e.g, this can be used to store some application-related
+     * context for use in your own built-in functions (like `display(a)`)
+     */
+    externalContext?: T
 }
 
 export interface Error {
