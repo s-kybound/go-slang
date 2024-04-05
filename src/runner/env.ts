@@ -7,6 +7,16 @@
 import { Value } from "../types";
 import { Builtin } from "./values/builtin";
 
+// from js-slang/src/types.ts
+// export interface Environment {
+//   readonly id: string
+//   name: string
+//   tail: Environment | null
+//   callExpression?: es.CallExpression
+//   head: Frame
+//   heap: Heap
+//   thisContext?: Value
+// }
 export class Environment {
   private parent: Environment | null = null;
   private bindings: Map<string, any> = new Map();

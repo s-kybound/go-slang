@@ -1,0 +1,11 @@
+{
+  "name": "go-slang",
+  "version": "1.0.0",
+  "main": "index.js",
+  "repository": "https://github.com/CS4215-AY2324S2-joy-kyriel/go-slang.git",
+  "author": "joytqt-1202 <e0775479@u.nus.edu>",
+  "license": "MIT",
+  "dependencies": {
+    "@types/estree": "^1.0.5"
+  }
+}
