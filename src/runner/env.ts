@@ -137,7 +137,7 @@ const defaultBuiltIns = {
     }
 };
 
-const createSlangContext = <T>(externalSymbols: string[] = [], externalContext?: T | undefined, externalBuiltIns: CustomBuiltIns = defaultBuiltIns) => {
+export const createSlangContext = <T>(externalSymbols: string[] = [], externalContext?: T | undefined, externalBuiltIns: CustomBuiltIns = defaultBuiltIns) => {
 	const context = createEmptyContext(externalSymbols, externalContext);
 	importBuiltins(context, externalBuiltIns);
 	importExternalSymbols(context, externalSymbols);
