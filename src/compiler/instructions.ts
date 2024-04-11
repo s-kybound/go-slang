@@ -2,6 +2,8 @@
  * This file contains the instruction set of our compiler.
  */
 
+import { Value } from "../types";
+
 export enum InstrType {
   LDC,
   UNOP,
@@ -47,7 +49,7 @@ export interface BaseInstr {
 }
 
 export interface LDCInstr extends BaseInstr {
-  value: any;
+  value: Value;
 }
 
 export interface UNOPInstr extends BaseInstr {
