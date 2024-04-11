@@ -55,13 +55,13 @@ export class Runner {
       }
       // we have landed on a runnable goroutine.
       string += this.currGoroutine;
-      //console.log(string);
+      console.log(string);
       break;
     }
   }
 
   isDone() {
-    return this.goroutines.every(g => g.isDone());
+    return this.mainGoroutine.isDone();
   }
 
   isDeadlocked() {
