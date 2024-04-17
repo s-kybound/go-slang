@@ -152,6 +152,13 @@ export class NormalGoroutine implements Goroutine {
         this.runner.launchThread(this.programCounter + 1, this.environment);
         this.programCounter = (i as instr.LAUNCH_THREADInstr).addr;
         break;
+      case instr.InstrType.SEND:
+      case instr.InstrType.RECEIVE:
+      case instr.InstrType.SOF:
+      case instr.InstrType.ROF:
+      case instr.InstrType.BLOCK:
+      case instr.InstrType.CLEAR_WAIT:
+        throw new Error("Not implemented");
       case instr.InstrType.DONE:
         this.done = true;
         break;
