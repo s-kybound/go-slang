@@ -18,6 +18,11 @@ import {
   TCALLInstr,
   RESETInstr,
   LAUNCH_THREADInstr,
+  SENDInstr,
+  RECEIVEInstr,
+  SOFInstr,
+  ROFInstr,
+  BLOCKInstr,
   DONEInstr
 } from "./instructions"
 
@@ -83,4 +88,24 @@ export function makeLAUNCH_THREADInstr(addr: number): LAUNCH_THREADInstr {
 
 export function makeDONEInstr(): DONEInstr {
   return { type: InstrType.DONE }
+}
+
+export function makeSENDInstr(): SENDInstr {
+  return { type: InstrType.SEND }
+}
+
+export function makeRECEIVEInstr(): RECEIVEInstr {
+  return { type: InstrType.RECEIVE }
+}
+
+export function makeSOFInstr(addr: number): SOFInstr {
+  return { type: InstrType.SOF, addr: addr }
+}
+
+export function makeROFInstr(addr: number): ROFInstr {
+  return { type: InstrType.ROF, addr: addr }
+}
+
+export function makeBLOCKInstr(): BLOCKInstr {
+  return { type: InstrType.BLOCK }
 }

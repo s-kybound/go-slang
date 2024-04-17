@@ -18,6 +18,11 @@ import {
   makeTCALLInstr,
   makeRESETInstr,
   makeLAUNCH_THREADInstr,
+  makeSENDInstr,
+  makeRECEIVEInstr,
+  makeSOFInstr,
+  makeROFInstr,
+  makeBLOCKInstr,
   makeDONEInstr
 } from "./instr_maker";
 
@@ -276,5 +281,70 @@ export class GoCompiler {
         this.instrs[this.wc++] = makeASSIGNInstr(comp.name.name);
       }
     },
+    sendStatement: (comp: ast_type.SendStatement) => {
+      // compile the channel
+      this.compileFuncs[comp.chan.type](comp.chan);
+      // compile the value
+      this.compileFuncs[comp.value.type](comp.value);
+      // add the send instruction - depends on whether we are in a select statement
+      // or not.
+      this.instrs[this.wc++] = comp.inSelect ? makeSOFInstr(0) : makeSENDInstr();
+    },
+    receiveExpression: (comp: ast_type.ReceiveExpression) => {
+      // compile the channel
+      this.compileFuncs[comp.chan.type](comp.chan);
+      // add the receive instruction - depends on whether we are in a select statement
+      this.instrs[this.wc++] = comp.inSelect ? makeROFInstr(0) : makeRECEIVEInstr();
+    },
+    selectCase: (comp: ast_type.SelectCase) => {
+      // compile the statement
+      this.compileFuncs[comp.statement.type](comp.statement);
+      // compile the body
+      comp.body.forEach((stmt) => {
+        this.compileFuncs[stmt.type](stmt);
+        });
+    },
+    defaultCase: (comp: ast_type.DefaultCase) => {
+      // compile the body
+      comp.body.forEach((stmt) => {
+        this.compileFuncs[stmt.type](stmt);
+        });
+    },
+    selectStatement: (comp: ast_type.SelectStatement) => {
+      // first create a new scope
+      this.instrs[this.wc++] = makeENTER_SCOPEInstr();
+      // then create a block instruction that is skipped over
+      // when entering the select statement
+      const goto = makeGOTOInstr(0);
+      this.instrs[this.wc++] = goto;
+      const blockaddr = this.wc;
+      this.instrs[this.wc++] = makeBLOCKInstr();
+      goto.addr = this.wc;
+      // each case should have a goto instruction that points to the end
+      // of the select statement
+      const caseGotos: inst.GOTOInstr[] = [];
+      // compile every case
+      comp.cases.forEach((c) => {
+        // TODO - link the ROF/SOF instructions to the next case
+        this.compileFuncs[c.type](c);
+        const goto = makeGOTOInstr(0);
+        this.instrs[this.wc++] = goto;
+        caseGotos.push(goto);
+      });
+
+      // if none of the cases were executed,
+      // we will land on this goto, which will
+      // block the goroutine
+      this.instrs[this.wc++] = makeGOTOInstr(blockaddr);
+      
+      // otherwise, the cases should jump to the instruction after this block
+      // right here - this is the end of the select statement
+      caseGotos.forEach((goto) => {
+        goto.addr = this.wc;
+      });
+
+      // we exit the scope with this instruction
+      this.instrs[this.wc++] = makeEXIT_SCOPEInstr();
+    }
   }
 }
