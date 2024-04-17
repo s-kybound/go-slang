@@ -5,11 +5,14 @@ import { Environment } from "../env";
 import { Closure, isClosure } from "../values/closure";
 import { Frame, isCallFrame, makeBlockFrame, makeCallFrame } from "../runtime_stack_items";
 import { isBuiltin } from "../values/builtin";
+import { Channel } from "../values/channel";
 
 export interface Goroutine {
   isDone(): boolean;
   isBlocked(): boolean;
   isRunnable(): boolean;
+  waitingChannelIsFree(): boolean;
+  unblock(): void;
   run(): void;
 }
 
@@ -20,6 +23,7 @@ export class NormalGoroutine implements Goroutine {
   readonly runtimeStack: Stack<Frame>;
   readonly operandStack: Stack<any>;
   private environment: Environment;
+  private waitingOn: [Channel, string][] = [];
   private done: boolean = false;
   private blocked: boolean = false;
 
@@ -42,6 +46,20 @@ export class NormalGoroutine implements Goroutine {
 
   isRunnable() {
     return !this.done && !this.blocked;
+  }
+ 
+  // scan the waitingOn list and see if any of the channels are free
+  waitingChannelIsFree(): boolean {
+    for (let i = 0; i < this.waitingOn.length; i++) {
+      const [chan, op] = this.waitingOn[i];
+      if (op === "SEND" && !chan.isFull()) {
+        return true;
+      }
+      if (op === "RECEIVE" && !chan.isEmpty()) {
+        return true;
+      }
+    }
+    return false;
   }
 
   private executeInstruction(i: instr.Instr) {
@@ -153,12 +171,88 @@ export class NormalGoroutine implements Goroutine {
         this.programCounter = (i as instr.LAUNCH_THREADInstr).addr;
         break;
       case instr.InstrType.SEND:
-      case instr.InstrType.RECEIVE:
-      case instr.InstrType.SOF:
-      case instr.InstrType.ROF:
+        {
+        const val = this.operandStack.pop();
+        const chan = this.operandStack.pop() as Channel;
+        /*
+        if (!isChannel(channel)) {
+          throw new Error("Expected a channel");
+        }
+        */
+        if (chan.isFull()) {
+          this.blocked = true;
+          this.waitingOn.push([chan, "SEND"]);
+          this.runner.cycleNext();
+          return;
+        }
+        chan.send(val);
+        this.programCounter++;
+        }
+        break;
+      case instr.InstrType.RECEIVE: {
+        const chan = this.operandStack.pop() as Channel;
+        /*
+        if (!isChannel(channel)) {
+          throw new Error("Expected a channel");
+        }
+        */
+        if (chan.isEmpty()) {
+          this.blocked = true;
+          this.waitingOn.push([chan, "RECEIVE"]);
+          this.runner.cycleNext();
+          break;
+        }
+        const val = chan.receive();
+        this.operandStack.push(val);
+        this.programCounter++;
+      }
+        break;
+      case instr.InstrType.SOF: {
+        const val = this.operandStack.pop();
+        const chan = this.operandStack.pop() as Channel;
+        if (chan.isFull()) {
+          console.log("channel is full, failing send");
+          // the send fails
+          // jump to the specified address
+          this.programCounter = (i as instr.SOFInstr).addr;
+          // and add the channel to the list of channels we are waiting on
+          this.waitingOn.push([chan, "SEND"]);
+        } else {
+          // send the value
+          chan.send(val);
+          this.programCounter++;
+        }
+      }
+        break;
+      case instr.InstrType.ROF: {
+        const chan = this.operandStack.pop() as Channel;
+        if (chan.isEmpty()) {
+          console.log("channel is empty, failing receive");
+          // the receive fails
+          // jump to the specified address
+          this.programCounter = (i as instr.ROFInstr).addr;
+          // and add the channel to the list of channels we are waiting on
+          this.waitingOn.push([chan, "RECEIVE"]);
+        } else {
+          // receive the value
+          const val = chan.receive();
+          this.operandStack.push(val);
+          this.programCounter++;
+        }
+      }
+        break;
       case instr.InstrType.BLOCK:
+        // block this goroutine
+        this.blocked = true;
+        // signal the runner to get a new goroutine
+        this.runner.cycleNext();
+        this.programCounter++;
+        break;
       case instr.InstrType.CLEAR_WAIT:
-        throw new Error("Not implemented");
+        // reset the blocked state
+        this.waitingOn = [];
+        this.programCounter++;
+        break;
       case instr.InstrType.DONE:
         this.done = true;
         break;
@@ -218,8 +312,19 @@ export class NormalGoroutine implements Goroutine {
       //console.log("after: ", this.operandStack)
     } catch (e) {
       // display the current stack trace
+      console.log("failed at instruction: ", instr);
+      console.log("wc: ", this.programCounter);
+      for (let i = 0; i < this.instructions.length; i++) {
+        console.log(i, this.instructions[i]);
+      }
+      console.log("operand stack: ", this.operandStack);
+      console.log("runtime stack: ", this.runtimeStack);
       throw e;
     }
+  }
+
+  unblock() {
+    this.blocked = false;
   }
 
   getFinalValue() {

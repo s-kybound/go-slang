@@ -124,6 +124,9 @@ export class GoCompiler {
       this.instrs[this.wc++] = makeCALLInstr(0);
       this.instrs[this.wc++] = makeDONEInstr();
       },
+    emptyStatement: (comp: ast_type.EmptyStatement) => {
+      // do nothing
+      },
     identifier: (comp: ast_type.Identifier) => {
       this.instrs[this.wc++] = makeLDInstr(comp.name);
       },
@@ -286,7 +289,7 @@ export class GoCompiler {
       // compile the channel
       this.compileFuncs[comp.chan.type](comp.chan);
       // compile the value
-      this.compileFuncs[comp.value.type](comp.value);
+      this.compileFuncs[comp.val.type](comp.val);
       // add the send instruction - depends on whether we are in a select statement
       // or not.
       this.instrs[this.wc++] = comp.inSelect ? makeSOFInstr(0) : makeSENDInstr();

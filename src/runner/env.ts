@@ -6,6 +6,7 @@
 
 import { Value } from "../types";
 import { Builtin } from "./values/builtin";
+import { Channel } from "./values/channel";
 
 export class Environment {
   private parent: Environment | null = null;
@@ -49,4 +50,4 @@ export class Environment {
   }
 }
 
-export const globalEnvironment = new Environment(null, ["display"], [new Builtin((x: any) => console.log(x))]);
+export const globalEnvironment = new Environment(null, ["display", "makeChannel"], [new Builtin((x: any) => console.log(x)), new Builtin(() => new Channel())]);
