@@ -20,6 +20,11 @@ export enum InstrType {
   TCALL,
   RESET,
   LAUNCH_THREAD,
+  SEND,
+  RECEIVE,
+  SOF,
+  ROF,
+  BLOCK,
   DONE
 }
 
@@ -101,6 +106,25 @@ export interface LAUNCH_THREADInstr extends BaseInstr {
   addr: number;
 }
 
+// takes a channel from the OS - sends item to it or blocks
+export interface SENDInstr extends BaseInstr {}
+
+// takes a channel from the OS - receives from it or blocks
+export interface RECEIVEInstr extends BaseInstr {}
+
+// send-or-jump - sends item or jumps
+export interface SOFInstr extends BaseInstr {
+  addr: number
+}
+
+// receive-or-jump - receives item or jumps
+export interface ROFInstr extends BaseInstr {
+  addr: number
+}
+
+// blocks goroutine
+export interface BLOCKInstr extends BaseInstr {}
+
 export interface DONEInstr extends BaseInstr {}
 
 export type Instr = 
@@ -119,4 +143,9 @@ export type Instr =
   | TCALLInstr 
   | RESETInstr
   | LAUNCH_THREADInstr
+  | SENDInstr
+  | RECEIVEInstr
+  | SOFInstr
+  | ROFInstr
+  | BLOCKInstr
   | DONEInstr;
