@@ -25,6 +25,7 @@ export enum InstrType {
   SOF,
   ROF,
   BLOCK,
+  CLEAR_WAIT,
   DONE
 }
 
@@ -125,6 +126,9 @@ export interface ROFInstr extends BaseInstr {
 // blocks goroutine
 export interface BLOCKInstr extends BaseInstr {}
 
+// clears a goroutine of waiting channels
+export interface CLEAR_WAITInstr extends BaseInstr {}
+
 export interface DONEInstr extends BaseInstr {}
 
 export type Instr = 
@@ -148,4 +152,5 @@ export type Instr =
   | SOFInstr
   | ROFInstr
   | BLOCKInstr
+  | CLEAR_WAITInstr
   | DONEInstr;

@@ -23,7 +23,8 @@ import {
   SOFInstr,
   ROFInstr,
   BLOCKInstr,
-  DONEInstr
+  DONEInstr,
+  CLEAR_WAITInstr
 } from "./instructions"
 
 export function makeLDCInstr(value: Value): LDCInstr {
@@ -104,6 +105,10 @@ export function makeSOFInstr(addr: number): SOFInstr {
 
 export function makeROFInstr(addr: number): ROFInstr {
   return { type: InstrType.ROF, addr: addr }
+}
+
+export function makeCLEAR_WAITInstr(): CLEAR_WAITInstr {
+  return { type: InstrType.CLEAR_WAIT }
 }
 
 export function makeBLOCKInstr(): BLOCKInstr {

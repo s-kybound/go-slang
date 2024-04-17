@@ -23,7 +23,8 @@ import {
   makeSOFInstr,
   makeROFInstr,
   makeBLOCKInstr,
-  makeDONEInstr
+  makeDONEInstr,
+  makeCLEAR_WAITInstr
 } from "./instr_maker";
 
 import * as inst from "./instructions";
@@ -296,20 +297,6 @@ export class GoCompiler {
       // add the receive instruction - depends on whether we are in a select statement
       this.instrs[this.wc++] = comp.inSelect ? makeROFInstr(0) : makeRECEIVEInstr();
     },
-    selectCase: (comp: ast_type.SelectCase) => {
-      // compile the statement
-      this.compileFuncs[comp.statement.type](comp.statement);
-      // compile the body
-      comp.body.forEach((stmt) => {
-        this.compileFuncs[stmt.type](stmt);
-        });
-    },
-    defaultCase: (comp: ast_type.DefaultCase) => {
-      // compile the body
-      comp.body.forEach((stmt) => {
-        this.compileFuncs[stmt.type](stmt);
-        });
-    },
     selectStatement: (comp: ast_type.SelectStatement) => {
       // first create a new scope
       this.instrs[this.wc++] = makeENTER_SCOPEInstr();
@@ -324,12 +311,57 @@ export class GoCompiler {
       // of the select statement
       const caseGotos: inst.GOTOInstr[] = [];
       // compile every case
+      // we don't handle select and default cases outside of the select statement, as 
+      // they won't exist outside
       comp.cases.forEach((c) => {
-        // TODO - link the ROF/SOF instructions to the next case
-        this.compileFuncs[c.type](c);
-        const goto = makeGOTOInstr(0);
-        this.instrs[this.wc++] = goto;
-        caseGotos.push(goto);
+        // there are 2 cases - the default case and the select case
+        // we will handle the default case first
+        if (c.type === "defaultCase") {
+          const def = c as ast_type.DefaultCase;
+          // compile default case - this is just a block
+          def.body.forEach((stmt) => {
+            this.compileFuncs[stmt.type](stmt);
+          });
+          // add a goto instruction that points to the end of the select statement
+          const defaultGoto = makeGOTOInstr(0);
+          this.instrs[this.wc++] = defaultGoto;
+          caseGotos.push(defaultGoto);
+          return;
+        }
+        // this is a select case
+        const sel = c as ast_type.SelectCase;
+        let currSF = this.wc;
+        let rofOrSof;
+        // compile the select case statement
+        this.compileFuncs[sel.statement.type](sel.statement);
+
+        // we need to find the SOF or ROF instruction that was just added -
+        // we are assured it exists - as the parser prevents a select case without a SOF or ROF.
+        for (let i = currSF; i < this.wc; i++) {
+          if (this.instrs[i].type === inst.InstrType.SOF || this.instrs[i].type === inst.InstrType.ROF) {
+            rofOrSof = this.instrs[i] as inst.SOFInstr | inst.ROFInstr;
+            break;
+          }
+        }
+
+        if (rofOrSof === undefined) {
+          throw new Error("Could not find SOF or ROF instruction");
+        }
+
+        // compile the body
+        sel.body.forEach((stmt) => {
+          this.compileFuncs[stmt.type](stmt);
+        });
+        
+        // add a goto instruction that points to the end of the select statement
+        const caseGoto = makeGOTOInstr(0);
+        this.instrs[this.wc++] = caseGoto;
+        caseGotos.push(caseGoto);
+
+        // set the address of the rof or sof to the current wc - this will 
+        // make it jump to the very next case
+        rofOrSof.addr = this.wc;
+        return;
       });
 
       // if none of the cases were executed,
@@ -343,7 +375,10 @@ export class GoCompiler {
         goto.addr = this.wc;
       });
 
-      // we exit the scope with this instruction
+      // we clear the goroutine of any waiting channels
+      this.instrs[this.wc++] = makeCLEAR_WAITInstr();
+
+      // then we exit the scope
       this.instrs[this.wc++] = makeEXIT_SCOPEInstr();
     }
   }
