@@ -269,38 +269,36 @@ export class GoTypeChecker {
             } else if (!cond_type.isSameType(new ast_type.BasicTypeClass('bool'))) {
                 throw new Error(`Invalid Predicate Type ${cond_type.getTypeName()}, expected boolean`);
             }
-            let cons_type, alt_type: Array<ast_type.Type>;
-            cons_type = [];
-            alt_type = [];
+            let cons_type, alt_type: ast_type.Type | undefined;
+            let encounteredReturn = false;
             comp.cons.forEach((cons) => {
-                if (cons.type == 'returnStatement') {
-                    cons_type = this.compileTypeFuncs[cons.type](cons);
-                } else {
-                    this.compileTypeFuncs[cons.type](cons);
-                }
+                let cons_ret = this.checkReturnType(cons);
+                if (cons_ret != undefined && !encounteredReturn) {
+                    cons_type = cons_ret;
+                    encounteredReturn = true;
+                };
             });
 
+            encounteredReturn = false;
             if (comp.alt != null) {
                 comp.alt.forEach((alt) => {
-                    if (alt.type == 'returnStatement') {
-                        alt_type = this.compileTypeFuncs[alt.type](alt);
-                    } else {
-                        this.compileTypeFuncs[alt.type](alt);
+                    let alt_ret = this.checkReturnType(alt);
+                    if (alt_ret != undefined && !encounteredReturn) {
+                        alt_type = alt_ret;
+                        encounteredReturn = true;
                     }
                 });
 
-                if (cons_type.length != alt_type.length) {
-                    throw new Error(`Consequence and Alternate of If-Else return different number of values! Cons: ${cons_type.length}, Alt: ${alt_type.length}`);
+                if (cons_type == undefined && alt_type != undefined) {
+                    throw new Error(`Types of If-Else branch not matching! Cons: undefined, Alt: ${alt_type.getTypeName()}`);
                 }
-                let isMatched = true;
-                cons_type.forEach((element, index) => {
-                    isMatched = isMatched && 
-                        ((element == undefined && alt_type[index] == undefined) 
-                            || element.isSameType(alt_type[index]));
-                });
 
-                if (!isMatched) {
-                    throw new Error(`Types of If-Else branch not matching! Cons: ${cons_type}, Alt: ${alt_type}`);
+                if (cons_type != undefined) {
+                    if (alt_type == undefined) {
+                        throw new Error(`Types of If-Else branch not matching! Cons: ${cons_type.getTypeName()}, Alt: undefined`);
+                    } else if (!cons_type.isSameType(alt_type)) {
+                        throw new Error(`Types of If-Else branch not matching! Cons: ${cons_type.getTypeName()}, Alt: ${alt_type.getTypeName()}`);
+                    }
                 }
             }
 
