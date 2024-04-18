@@ -24,6 +24,33 @@ const WORD_SIZE = 8;
 
 const NODE_SIZE = 10;
 
+// tags used to represent the different types of nodes in the heap.
+export enum Tag {
+  FREE = 0, // a free node
+  UNALLOCATED = 1, // an unallocated item
+
+  // Data types
+  FALSE = 2, // a false boolean
+  TRUE = 3, // a true boolean
+  NUMBER = 4, // a JS number
+  NULL = 5, // a null value
+  UNDEFINED = 6, // an undefined value
+  CHAN = 7, // a channel
+  STRUCT = 8, // a struct
+  ARRAY = 9, // an array
+  SLICE = 10, // a slice
+  CLOSURE = 11, // a closure
+  BUILTIN = 12, // a builtin
+  STRING = 13, // a string
+
+  // Environment types
+  ENVIRONMENT = 14, // an environment
+  FRAME = 15, // a frame
+  BLOCKFRAME = 16, // a block frame
+  CALLFRAME = 17, // a call frame
+  EXTENSION = 18, // an extension node
+}
+
 export class Heap {
   // TAGGED POINTER CONVENTION
   // the first word of each node is the tagged pointer itself.
@@ -89,21 +116,24 @@ export class Heap {
   }
 
   setFreePointerAtAddress(address: number, next: number) {
-    // todo - add free tag
+    this.setTag(address, Tag.FREE);
     this.heap.setInt32(address * WORD_SIZE + 4, next);
   }
 
   getFreePointerAtAddress(address: number): number {
+    if (this.getTag(address) !== Tag.FREE) {
+      throw new Error("Not a free pointer");
+    }
     return this.heap.getInt32(address * WORD_SIZE + 4);
   }
 
   // the accessors for the tagged pointer
-  setTag(address: number, tag: number) {
+  setTag(address: number, tag: Tag) {
     this.setByteAtOffset(address, 0, tag);
   }
 
-  getTag(address: number): number {
-    return this.getByteAtOffset(address, 0);
+  getTag(address: number): Tag {
+    return this.getByteAtOffset(address, 0) as Tag;
   }
 
   set_num_children(address: number, children: number) {
@@ -116,7 +146,7 @@ export class Heap {
 
   // allocates a node in the heap, setting the tag and number of children.
   // returns the address allocated.
-  allocate(tag: number, children: number): number {
+  allocate(tag: Tag, children: number): number {
     // get the current free pointer from the heap
     const newNode = this.freePointer;
     // get the next free pointer from the free pointer's position
