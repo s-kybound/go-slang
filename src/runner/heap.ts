@@ -249,6 +249,10 @@ export class Heap {
     return this.getTag(address) === Tag.TRUE;
   }
 
+  isNumber(address: number): boolean {
+    return this.getTag(address) === Tag.NUMBER;
+  }
+
   isBoolean(address: number): boolean {
     return this.isFalse(address) || this.isTrue(address);
   }
@@ -350,6 +354,32 @@ export class Heap {
     return addr;
   }
 
+  channelIsFull(chan: number): boolean {
+    return this.getWord(chan + 1) === this.True;
+  }
+
+  channelIsEmpty(chan: number): boolean {
+    return this.getWord(chan + 1) === this.False;
+  }
+
+  channelPopItem(chan: number): number {
+    if (this.channelIsEmpty(chan)) {
+      throw new Error("Channel is empty");
+    }
+    const item = this.getWord(chan + 2);
+    this.setWord(chan + 2, this.Unallocated);
+    this.setWord(chan + 1, this.False);
+    return item;
+  }
+
+  channelPushItem(chan: number, item: number) {
+    if (this.channelIsFull(chan)) {
+      throw new Error("Channel is full");
+    }
+    this.setWord(chan + 2, item);
+    this.setWord(chan + 1, this.True);
+  }
+
   // structs - dont know yet
   // most likely a tagged pointer with children pointing to the fields
   // of the struct.
@@ -438,6 +468,14 @@ export class Heap {
     return addr;
   }
 
+  getClosureArity(closure: number): number {
+    return this.heap.getInt16(closure * WORD_SIZE + 4);
+  }
+
+  getClosurePC(closure: number): number {
+    return this.heap.getInt16(closure * WORD_SIZE + 6);
+  }
+
   // builtins are represented as a tagged pointer.
   // they have no children.
   // the metadata consists of the id of the builtin to call.
@@ -457,7 +495,10 @@ export class Heap {
   }
 
   fetchAddressFromStringPool(hash: number): number | undefined {
-    throw new Error("Not implemented");
+    if (this.stringPool[hash] === undefined) {
+      return undefined;
+    }
+    return this.stringPool[hash][0];
   }
 
   // strings have no children,
@@ -478,6 +519,11 @@ export class Heap {
 
     this.setWord(addr + 1, hash);
     return addr;
+  }
+
+  getString(address: number): string {
+    const hash = this.getWord(address + 1);
+    return this.stringPool[hash][1];
   }
 
   // environments are represented as a tagged pointer.
@@ -529,6 +575,68 @@ export class Heap {
         this.setWord(addr + i, this.Unallocated);
       }
     }
+    return addr;
+  }
+
+  // allocate a new environment, given a parent environment and a frame.
+  extendEnvironment(env: number, frame: number): number {
+    // first, allocate a new environment
+    const addr = this.allocateEnvironment(0);
+
+    if (this.getNumChildren(env) >= 8) { 
+      // we need to copy every frame from the old environment
+      // to the new environment.
+      // start with the environment node itself.
+      for (let i = 1; i <= 8; i++) {
+        this.setWord(addr + i, this.getWord(env + i));
+      }
+      let newWorking = addr;
+      let oldWorking = env;
+      while (this.getNumChildren(oldWorking) > 8) {
+        // allocate a new extension node
+        const ext = this.allocateExtension(9);
+        // set the extension node to the new working node
+        this.setWord(newWorking + 9, ext);
+        // set every child of the extension to the old working node
+        for (let i = 1; i <= 8; i++) {
+          this.setWord(ext + i, this.getWord(oldWorking + i));
+        }
+        // traverse down the extension node
+        newWorking = ext;
+        oldWorking = this.getWord(oldWorking + 9);
+      }
+      // 2 cases are possible here:
+      // 1. the old working node has < 8 children, so we can just copy a new extension node
+      // 2. the old environment has exactly 8 children, so we need to allocate one more extension node.
+      if (this.getNumChildren(oldWorking) < 8) {
+        const ext = this.allocateExtension(this.getNumChildren(oldWorking + 1));
+        this.setWord(newWorking + 9, ext);
+        let i = 1;
+        for (; i <= this.getNumChildren(oldWorking); i++) {
+          this.setWord(ext + i, this.getWord(oldWorking + i));
+        }
+        this.setWord(ext + i, frame);
+        return addr;
+      }
+      // we need to allocate yet another node
+      let ext = this.allocateExtension(9);
+      this.setWord(newWorking + 9, ext);
+      for (let i = 1; i <= 8; i++) {
+        this.setWord(ext + i, this.getWord(oldWorking + i));
+      }
+      // allocate another extension node
+      // the one child of the extension node is the new frame
+      ext = this.allocateExtension(1);
+      this.setWord(newWorking + 9, ext);
+      this.setWord(ext + 1, frame);
+      return addr;
+    }
+
+    // there's no need to reason about extensions.
+    // just set the new frame to the next child of the environment.
+    const children = this.getNumChildren(env);
+    this.setWord(addr + children + 1, frame);
+    this.setNumChildren(addr, children + 1);
     return addr;
   }
 
@@ -592,12 +700,25 @@ export class Heap {
     return addr;
   }
 
+  getBlockFrameEnv(blockFrame: number): number {
+    return this.getWord(blockFrame + 1);
+  }
+
   // call frames are represented as a tagged pointer, with
   // the environment of the call frame as the single child.
-  allocateCallFrame(env: number): number {
+  allocateCallFrame(env: number, pc: number): number {
     const addr = this.allocate(Tag.CALLFRAME, 1);
     this.setWord(addr + 1, env);
+    this.setWord(addr + 2, pc);
     return addr;
+  }
+
+  getCallFrameEnv(callFrame: number): number {
+    return this.getWord(callFrame + 1);
+  }
+
+  getCallFramePC(callFrame: number): number {
+    return this.getWord(callFrame + 2);
   }
 
   // extension frames are represented as a tagged pointer, with
@@ -619,5 +740,43 @@ export class Heap {
     const addr = this.allocate(Tag.WAIT_RECEIVE, 1);
     this.setWord(addr + 1, chan);
     return addr;
+  }
+
+  valueToAddress(value: any): number {
+    if (typeof value === "number") {
+      return this.allocateNumber(value);
+    }
+    if (typeof value === "boolean") {
+      return value ? this.True : this.False;
+    }
+    if (typeof value === "string") {
+      return this.allocateString(value);
+    }
+    if (value === null) {
+      return this.Null;
+    }
+    if (value === undefined) {
+      return this.Undefined;
+    }
+    throw new Error("Unsupported value");
+  }
+
+  addressToValue(address: number): any {
+    if (this.isNumber(address)) {
+      return this.getWord(address + 1);
+    }
+    if (this.isBoolean(address)) {
+      return this.isTrue(address);
+    }
+    if (this.isString(address)) {
+      return this.getString(address);
+    }
+    if (this.isNull(address)) {
+      return null;
+    }
+    if (this.isUndefined(address)) {
+      return undefined;
+    }
+    throw new Error("Unsupported address");
   }
 }
