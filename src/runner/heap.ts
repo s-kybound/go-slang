@@ -66,6 +66,12 @@ export class Heap {
     return new Heap(size * MEGABYTE);
   }
 
+  // create a new heap with a size given in bytes.
+  // we can use this to test GC with smaller heaps.
+  static createWithBytes(size: number): Heap {
+    return new Heap(size);
+  }
+
   setByteAtOffset(address: number, offset: number, value: number) {
     this.heap.setUint8(address * WORD_SIZE + offset, value);
   }
