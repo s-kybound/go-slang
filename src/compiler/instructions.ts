@@ -76,7 +76,9 @@ export interface GOTOInstr extends BaseInstr {
   addr: number;
 }
 
-export interface ENTER_SCOPEInstr extends BaseInstr {}
+export interface ENTER_SCOPEInstr extends BaseInstr {
+  syms: string[];
+}
 
 export interface EXIT_SCOPEInstr extends BaseInstr {}
 

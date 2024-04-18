@@ -51,8 +51,8 @@ export function makeGOTOInstr(addr: number): GOTOInstr {
   return { type: InstrType.GOTO, addr: addr }
 }
 
-export function makeENTER_SCOPEInstr(): ENTER_SCOPEInstr {
-  return { type: InstrType.ENTER_SCOPE }
+export function makeENTER_SCOPEInstr(locals: string[]): ENTER_SCOPEInstr {
+  return { type: InstrType.ENTER_SCOPE, syms: locals }
 }
 
 export function makeEXIT_SCOPEInstr(): EXIT_SCOPEInstr {

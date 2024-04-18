@@ -98,7 +98,9 @@ export class NormalGoroutine implements Goroutine {
       case instr.InstrType.ENTER_SCOPE:
         // make a new scope
         this.runtimeStack.push(makeBlockFrame(this.environment));
-        this.environment = this.environment.extend();
+        const locals = (i as instr.ENTER_SCOPEInstr).syms;
+        const unassingneds = locals.map(_ => undefined);
+        this.environment = this.environment.extend(locals, unassingneds);
         this.programCounter++;
         break;
       case instr.InstrType.EXIT_SCOPE:

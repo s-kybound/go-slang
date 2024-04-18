@@ -37,7 +37,10 @@ interface CompileFuncs {
 
 // search for all variables in a node. will allow us to 
 // assign variables to memory locations at compile time.
-function scanForVariables(node: ast_type.GoNode): string[] {
+function scanForVariables(node: ast_type.GoNode | null): string[] {
+  if (node === null) {
+    return [];
+  }
   const vars: string[] = [];
   switch (node.type) {
     case "function":
@@ -138,6 +141,10 @@ export class GoCompiler {
   compileFuncs: CompileFuncs = {
     program: (comp: ast_type.Program) => {
       // compile everything
+      // find the top level declarations
+      let locals = comp.top_declarations.flatMap(scanForVariables);
+      // create a new scope - this is the program environment
+      this.instrs[this.wc++] = makeENTER_SCOPEInstr(locals);
       comp.top_declarations.forEach((decl) => {
         this.compileFuncs[decl.type](decl);
         });
@@ -227,8 +234,15 @@ export class GoCompiler {
         });
       },
     ifStatement: (comp: ast_type.IfStatement) => {
+      // get the local variables in the if statement
+      let locals: string[] = [];
+      locals = locals.concat(scanForVariables(comp.short));
+      locals = locals.concat(comp.cons.flatMap(scanForVariables));
+      if (comp.alt !== null) {
+        locals = locals.concat(comp.alt.flatMap(scanForVariables));
+      }
       // first create a new scope
-      this.instrs[this.wc++] = makeENTER_SCOPEInstr();
+      this.instrs[this.wc++] = makeENTER_SCOPEInstr(locals);
       if (comp.short !== null) {
         this.compileFuncs[comp.short.type](comp.short);
       }
@@ -249,8 +263,14 @@ export class GoCompiler {
       goto.addr = this.wc;
     },
     forStatement: (comp: ast_type.ForStatement) => {
+      // get the local variables in the if statement
+      let locals: string[] = [];
+      locals = locals.concat(scanForVariables(comp.init));
+      locals = locals.concat(scanForVariables(comp.cond));
+      locals = locals.concat(scanForVariables(comp.post));
+      locals = locals.concat(comp.body.flatMap(scanForVariables));
       // first create a new scope
-      this.instrs[this.wc++] = makeENTER_SCOPEInstr();
+      this.instrs[this.wc++] = makeENTER_SCOPEInstr(locals);
       // compile the initializer
       if (comp.init !== null) {
         this.compileFuncs[comp.init.type](comp.init);
@@ -294,6 +314,10 @@ export class GoCompiler {
       this.instrs[this.wc++] = makeLDFInstr(comp.formals.map(c => c.name), this.wc + 1);
       const goto = makeGOTOInstr(0)
       this.instrs[this.wc++] = goto;
+      // scan the function body for variables
+      let locals = comp.body.flatMap(scanForVariables);
+      // create a new scope
+      this.instrs[this.wc++] = makeENTER_SCOPEInstr(locals);
       // compile the function body
       comp.body.forEach((stmt) => {
         this.compileFuncs[stmt.type](stmt);
@@ -324,8 +348,13 @@ export class GoCompiler {
       this.instrs[this.wc++] = comp.inSelect ? makeROFInstr(0) : makeRECEIVEInstr();
     },
     selectStatement: (comp: ast_type.SelectStatement) => {
+      // get the local variables in the if statement
+      let locals: string[] = [];
+      comp.cases.forEach((c) => {
+        locals = locals.concat(c.body.flatMap(scanForVariables));
+      });
       // first create a new scope
-      this.instrs[this.wc++] = makeENTER_SCOPEInstr();
+      this.instrs[this.wc++] = makeENTER_SCOPEInstr(locals);
       // then create a block instruction that is skipped over
       // when entering the select statement
       const goto = makeGOTOInstr(0);
