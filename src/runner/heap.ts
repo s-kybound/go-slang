@@ -640,6 +640,38 @@ export class Heap {
     return addr;
   }
 
+  // get the environment value at a given index.
+  // the index is represented by [frame index, binding index]
+  // both are 0-indexed.
+  getEnvironmentValue(env: number, index: [number, number]): number {
+    let [frameIndex, bindingIndex] = index;
+    // get the correct frame
+    let working = env;
+    while (frameIndex > 7) {
+      working = this.getWord(working + 9);
+      frameIndex -= 8;
+    }
+    // working now points to the correct node
+    const frame = this.getWord(working + frameIndex + 1);
+    return this.getFrameValue(frame, bindingIndex);
+  }
+
+  // set the environment value at a given index.
+  // the index is represented by [frame index, binding index]
+  // both are 0-indexed.
+  setEnvironmentValue(env: number, index: [number, number], value: number) {
+    let [frameIndex, bindingIndex] = index;
+    // get the correct frame
+    let working = env;
+    while (frameIndex > 7) {
+      working = this.getWord(working + 9);
+      frameIndex -= 8;
+    }
+    // working now points to the correct node
+    const frame = this.getWord(working + frameIndex + 1);
+    this.setFrameValue(frame, bindingIndex, value);
+  }
+
   // frames are represented as a tagged pointer.
   // they have children corresponding to the bindings in the frame.
   allocateFrame(bindings: number): number {
@@ -690,6 +722,32 @@ export class Heap {
       }
     }
     return addr;
+  }
+
+  // get the value at a given index in the frame.
+  // index is 0-indexed.
+  getFrameValue(frame: number, index: number): number {
+    // if index is more than 7, we need to traverse down the extension nodes
+    let working = frame;
+    while (index > 7) {
+      working = this.getWord(working + 9);
+      index -= 8;
+    }
+    // working now points to the correct node
+    return this.getWord(working + index + 1);
+  }
+
+  // set the value at a given index in the frame.
+  // index is 0-indexed.
+  setFrameValue(frame: number, index: number, value: number) {
+    // if index is more than 7, we need to traverse down the extension nodes
+    let working = frame;
+    while (index > 7) {
+      working = this.getWord(working + 9);
+      index -= 8;
+    }
+    // working now points to the correct node
+    this.setWord(working + index + 1, value);
   }
 
   // block frames are represented as a tagged pointer, with
