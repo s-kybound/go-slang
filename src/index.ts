@@ -51,5 +51,4 @@ const instructions = compiler.getInstrs();
 const QUANTUM = 22;
 
 const runner = new Runner(instructions, QUANTUM, 4);
-console.log("running program...")
 runner.run();
