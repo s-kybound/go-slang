@@ -39,9 +39,22 @@ export class Environment {
     throw new Error(`Variable ${name} not found`);
   }
 
-  // set the value of a variable
-  set(name: string, value: Value): void {
+  // assign a variable with a value in the scope
+  assign(name: string, value: Value): void {
     this.bindings.set(name, value);
+  }
+
+  // set the value of a variable in the environment
+  set(name: string, value: Value): void {
+    let e: Environment | null = this;
+    while (e !== null) {
+      if (e.bindings.has(name)) {
+        e.bindings.set(name, value);
+        return;
+      }
+      e = e.parent;
+    }
+    throw new Error(`Variable ${name} not found`);
   }
 
   // create a new environment with this environment as the parent

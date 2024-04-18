@@ -11,16 +11,32 @@ export class Runner {
   private readonly programEnvironment = globalEnvironment.extend();
   private readonly mainGoroutine: NormalGoroutine;
   private currGoroutine: number;
+  private time: number = 0;
+
+  // memory is represented as a shared array buffer. All goroutines will share the same SharedArrayBuffer, but use internal
+  // dataviews to track the data in the buffer.
+  private memory: SharedArrayBuffer;
 
   // quantum of time to run each goroutine.
   private readonly quantum: number;
 
-  constructor(instructions: instr.Instr[], quantum: number) {
+  /**
+   * 
+   * @param instructions the compiled instructions for the program.
+   * @param quantum the quantum each goroutine is allowed to run for. (removed once webworkers are added).
+   * @param size the size of memory (in megabytes)
+   */
+  constructor(instructions: instr.Instr[], quantum: number, size: number) {
     this.instructions = instructions;
     this.quantum = quantum;
     this.mainGoroutine = new NormalGoroutine(0, this, this.instructions, this.programEnvironment);
     this.goroutines = [this.mainGoroutine];
     this.currGoroutine = 0;
+    const megabytes = 2 ** 20;
+    this.memory = new SharedArrayBuffer(size * (2 ** 20));
+    // the first 4 bytes of the memory are reserved to store the free pointer of the memory.
+    const freePointer = new DataView(this.memory);
+    freePointer.setInt32(0, 4);
   }
 
   getInstructions() {
@@ -39,46 +55,72 @@ export class Runner {
   // move to the next available goroutine.
   cycleNext() {
     let string = "context switching from: " + this.currGoroutine + " to ";
-    while (true) {
-      this.currGoroutine = (this.currGoroutine + 1) % this.goroutines.length;
-      if (this.goroutines[this.currGoroutine].isDone() && this.currGoroutine !== 0) {
-        // clean up the goroutine
-        this.goroutines.splice(this.currGoroutine, 1);
-        // check if currGoroutine now points to an invalid index - ie the last goroutine was removed.
-        if (this.currGoroutine >= this.goroutines.length) {
-          this.currGoroutine = 0;
+    // we will cycle through the goroutine ring once, finding the next runnable goroutine,
+    // and cleaning up any goroutines that are done.
+    let currLength = this.goroutines.length;
+    let toClean: number[] = [];
+    let foundGoroutine = false;
+    for (let i = 0; i < currLength; i++) {
+      // get the next goroutine
+      const goroutineToCheck = (this.currGoroutine + i) % this.goroutines.length;
+
+      // if the goroutine is done, we will clean it up.
+      if (this.goroutines[goroutineToCheck].isDone() && goroutineToCheck !== 0) {
+        toClean.push(goroutineToCheck);
+        continue;
+      }
+
+      // if we have already found a goroutine to run, we will skip the rest of the loop.
+      if (foundGoroutine) {
+        continue;
+      }
+
+      // if the goroutine is blocked, we will check if we can unblock it.
+      if (this.goroutines[goroutineToCheck].isBlocked()) {
+        // we have found a blocked goroutine, we will reason about it 
+        // and check if it can be unblocked.
+        if (this.goroutines[goroutineToCheck].waitingChannelIsFree()) {
+          this.goroutines[goroutineToCheck].unblock();
+          foundGoroutine = true;
+          this.currGoroutine = goroutineToCheck;
         }
         continue;
       }
-      if (this.goroutines[this.currGoroutine].isBlocked()) {
-        continue;
-      }
-      // we have landed on a runnable goroutine.
-      string += this.currGoroutine;
-      console.log(string);
-      break;
+
+      // Otherwise, we have landed on a runnable goroutine.
+      foundGoroutine = true;
+      this.currGoroutine = goroutineToCheck;
     }
+    // if we have not found a runnable goroutine by the end of the loop,
+    // we know we are deadlocked
+    if (!foundGoroutine) {
+      throw new Error("Deadlock detected: all goroutines are blocked.");
+    }
+
+    // clean up goroutines marked as done in reverse order and adjust the nextGoroutine index
+    toClean.sort((a, b) => b - a).forEach(index => {
+      this.goroutines.splice(index, 1);
+      if (index < this.currGoroutine) {
+        this.currGoroutine--; // adjust the index due to the removal of goroutines before it
+      }
+    });
+
+    string += this.currGoroutine;
+    // console.log(string);
+    // reset the time to 0
+    this.time = 0;
   }
 
   isDone() {
     return this.mainGoroutine.isDone();
   }
 
-  isDeadlocked() {
-    return !this.isDone() && this.goroutines.every(g => !g.isRunnable());
-  }
-
   run(): any {
-    let time = 0;
     while (!this.isDone()) {
-      if (this.isDeadlocked()) {
-        throw new Error("Deadlock detected!");
-      }
       const currGoroutine = this.goroutines[this.currGoroutine];
       currGoroutine.run();
-      time++;
-      if (time === this.quantum) {
-        time = 0;
+      this.time++;
+      if (this.time >= this.quantum) {
         this.cycleNext();
       }
     }

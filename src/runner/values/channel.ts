@@ -20,12 +20,14 @@ export class Channel {
             return null;
         }
         this.hasItem = false;
+        //console.log("item taken from channel");
         return this.item;
     }
 
     send(item: any) {
         this.item = item;
         this.hasItem = true;
+        //console.log("item sent to channel")
     }
 
     toString() {

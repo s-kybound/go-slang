@@ -35,6 +35,29 @@ interface CompileFuncs {
   [key: string]: (comp: any) => void;
 }
 
+// search for all variables in a node. will allow us to 
+// assign variables to memory locations at compile time.
+function scanForVariables(node: ast_type.GoNode): string[] {
+  const vars: string[] = [];
+  switch (node.type) {
+    case "function":
+      const func = node as ast_type.FunctionNode;
+      if (func.name) {
+        vars.push(func.name.name);
+      }
+      break;
+    case "declaration":
+      const decl = node as ast_type.Declaration;
+      decl.ids.forEach((id) => {
+        vars.push(id.name);
+      });
+      break;
+    default:
+      break;
+  }
+  return vars;
+}
+
 export class GoCompiler {
   private ast: ast_type.Program;
   private instrs: inst.Instr[];

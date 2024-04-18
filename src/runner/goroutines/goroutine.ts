@@ -116,7 +116,7 @@ export class NormalGoroutine implements Goroutine {
       case instr.InstrType.ASSIGN:
         const assignName = (i as instr.ASSIGNInstr).name;
         const assignValue = this.operandStack.pop();
-        this.environment.set(assignName, assignValue);
+        this.environment.assign(assignName, assignValue);
         this.programCounter++;
         break;
       case instr.InstrType.LDF:
@@ -180,6 +180,10 @@ export class NormalGoroutine implements Goroutine {
         }
         */
         if (chan.isFull()) {
+          // put the value and channel back on the stack
+          this.operandStack.push(chan);
+          this.operandStack.push(val);
+
           this.blocked = true;
           this.waitingOn.push([chan, "SEND"]);
           this.runner.cycleNext();
@@ -197,6 +201,9 @@ export class NormalGoroutine implements Goroutine {
         }
         */
         if (chan.isEmpty()) {
+          // put the channel back on the stack
+          this.operandStack.push(chan);
+
           this.blocked = true;
           this.waitingOn.push([chan, "RECEIVE"]);
           this.runner.cycleNext();
@@ -211,7 +218,7 @@ export class NormalGoroutine implements Goroutine {
         const val = this.operandStack.pop();
         const chan = this.operandStack.pop() as Channel;
         if (chan.isFull()) {
-          console.log("channel is full, failing send");
+          // console.log("channel is full, failing send");
           // the send fails
           // jump to the specified address
           this.programCounter = (i as instr.SOFInstr).addr;
@@ -227,7 +234,7 @@ export class NormalGoroutine implements Goroutine {
       case instr.InstrType.ROF: {
         const chan = this.operandStack.pop() as Channel;
         if (chan.isEmpty()) {
-          console.log("channel is empty, failing receive");
+          // console.log("channel is empty, failing receive");
           // the receive fails
           // jump to the specified address
           this.programCounter = (i as instr.ROFInstr).addr;
@@ -306,24 +313,18 @@ export class NormalGoroutine implements Goroutine {
     }
     const instr = this.instructions[this.programCounter];
     try {
-      //console.log("before: ", this.operandStack)
-      //console.log(instr);
+      //console.log("before: ", this.waitingOn)
+      //console.log(this.programCounter, instr);
       this.executeInstruction(instr);
-      //console.log("after: ", this.operandStack)
+      //console.log("after: ", this.waitingOn)
     } catch (e) {
       // display the current stack trace
-      console.log("failed at instruction: ", instr);
-      console.log("wc: ", this.programCounter);
-      for (let i = 0; i < this.instructions.length; i++) {
-        console.log(i, this.instructions[i]);
-      }
-      console.log("operand stack: ", this.operandStack);
-      console.log("runtime stack: ", this.runtimeStack);
       throw e;
     }
   }
 
   unblock() {
+    this.waitingOn = [];
     this.blocked = false;
   }
 
@@ -331,6 +332,11 @@ export class NormalGoroutine implements Goroutine {
     if (!this.done) {
       throw new Error("Goroutine not done yet");
     }
-    return this.operandStack.pop();
+    try {
+      return this.operandStack.pop();
+    } catch (e) {
+      // if there's no value on the stack, return undefined
+      return undefined;
+    }
   }
 }
