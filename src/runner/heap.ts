@@ -49,6 +49,8 @@ export enum Tag {
   BLOCKFRAME = 16, // a block frame
   CALLFRAME = 17, // a call frame
   EXTENSION = 18, // an extension node
+  WAIT_SEND = 19, // a wait send node
+  WAIT_RECEIVE = 20, // a wait receive node
 }
 
 export class Heap {
@@ -71,6 +73,17 @@ export class Heap {
   // free pointers are represented by a "linked list" of free nodes.
   private freePointer: number;
 
+  // a stringpool is implemented as a table of addresses and strings.
+  private stringPool: [number, string][] = [];
+
+  // The heap's literals
+  False: number;
+  True: number;
+  Null: number;
+  Undefined: number;
+  Unallocated: number;
+  globalEnv: number;
+
   // constructor for the heap.
   // remember that the size is given in bytes.
   private constructor(size: number) {
@@ -86,6 +99,9 @@ export class Heap {
     }
     // finally, set the last free pointer to -1
     this.setFreePointerAtAddress(i, -1);
+
+    // allocate the global environment
+    this.initGlobalEnv();
   }
 
   // create a new heap with a size given in megabytes.
@@ -101,6 +117,10 @@ export class Heap {
 
   setWord(address: number, value: number) {
     this.heap.setFloat64(address * WORD_SIZE + 8, value);
+  }
+
+  getWord(address: number): number {
+    return this.heap.getFloat64(address * WORD_SIZE + 8);
   }
 
   setByteAtOffset(address: number, offset: number, value: number) {
@@ -289,13 +309,26 @@ export class Heap {
     return this.getTag(address) === Tag.EXTENSION;
   }
 
+  isWaitSend(address: number): boolean {
+    return this.getTag(address) === Tag.WAIT_SEND;
+  }
+
+  isWaitReceive(address: number): boolean {
+    return this.getTag(address) === Tag.WAIT_RECEIVE;
+  }
+
   // On literals:
   // there will only ever be a single instance of true, false,
   // null, undefined, and the UNALLOCATED object, defined in the heap.
   // these all have no children, and will only be recognised by their tag.
-  createGlobalEnv(): number {
+  private initGlobalEnv() {
+    this.False = this.allocate(Tag.FALSE, 0);
+    this.True = this.allocate(Tag.TRUE, 0);
+    this.Null = this.allocate(Tag.NULL, 0);
+    this.Undefined = this.allocate(Tag.UNDEFINED, 0);
+    this.Unallocated = this.allocate(Tag.UNALLOCATED, 0);
     // TODO: implement the builtins and literals here
-    return this.allocate(Tag.ENVIRONMENT, 0);
+    this.globalEnv = this.allocate(Tag.ENVIRONMENT, 0);
   }
 
   // numbers are represented as a tagged pointer with the number
@@ -311,8 +344,10 @@ export class Heap {
   // they have 2 children: hasItem, which points to either
   // FALSE or TRUE, and item, which points to the item in the channel.
   allocateChannel(): number {
-    // TODO: implement the 2 children
-    return this.allocate(Tag.CHAN, 2);
+    const addr = this.allocate(Tag.CHAN, 2);
+    this.setWord(addr + 1, this.False);
+    this.setWord(addr + 2, this.Unallocated);
+    return addr;
   }
 
   // structs - dont know yet
@@ -327,10 +362,55 @@ export class Heap {
   // array.
   // the metadata consists of the size of the array.
   allocateArray(size: number): number {
-    // TODO: addional logic for children + extension
-    const addr = this.allocate(Tag.ARRAY, size);
+    // check the size of the array - how many extensions do we need?
+    let addr: number;
+    if (size > 8) {
+      // allocate the extensions
+      addr = this.allocate(Tag.ARRAY, 9);
+      // mark the address first, just in case we need to GC later
+      this.mark(addr);
+      // set the first 8 children to UNALLOCATED
+      for (let i = 1; i <= 8; i++) {
+        this.setWord(addr + i, this.Unallocated);
+      }
+      // allocate the extensions
+      let working = addr;
+      let sizeLeft = size - 8;
+      while (sizeLeft > 0) {
+        // allocate a single extension
+        const ext = this.allocateExtension(sizeLeft > 8 ? 9 : sizeLeft);
+        // mark the extension
+        this.mark(ext);
+        // set the extension node to the working node
+        this.setWord(working + 9, ext);
+        // set every child of the extension to UNALLOCATED
+        for (let i = 1; i <= 8; i++) {
+          this.setWord(ext + i, this.Unallocated);
+        }
+        // traverse down the extension node
+        working = ext;
+        sizeLeft -= 8;
+      }
+      // set the last extension node to UNALLOCATED
+      this.setWord(working + 9, this.Unallocated);
+      // unmark the address
+      this.unmark(addr);
+      working = addr;
+      // traverse down to the last extension node, unmarking as we go
+      while (this.getTag(working) === Tag.EXTENSION) {
+        this.unmark(working);
+        working = this.getWord(working + 9);
+      }
+    } else {
+      addr = this.allocate(Tag.ARRAY, size);
+      // set the children to UNALLOCATED
+      for (let i = 1; i <= size; i++) {
+        this.setWord(addr + i, this.Unallocated);
+      }
+    }
+    
     // set the last 4 bytes to the size of the array
-    this.heap.setInt32(addr * WORD_SIZE + 4, size);
+    this.heap.setInt32(addr * WORD_SIZE + 4, size); 
     return addr;
   }
 
@@ -367,28 +447,141 @@ export class Heap {
     return addr;
   }
 
+  hashString(str: string): number {
+    let hash = 5381;
+    for (let i = 0; i < str.length; i++) {
+      hash = (hash << 5) + hash + str.charCodeAt(i);
+      hash = hash & hash;
+    }
+    return hash >>> 0;
+  }
+
+  fetchAddressFromStringPool(hash: number): number | undefined {
+    throw new Error("Not implemented");
+  }
+
   // strings have no children,
-  // and have a hash corresponding to the string hash in the string pool.
+  // but have a hash corresponding to the string hash in the string pool.
   allocateString(str: string): number {
     // todo: implement the hash function plus the string pool
-    const hash = 0;
+    const hash = this.hashString(str);
+    const addr_or_undefined = this.fetchAddressFromStringPool(hash);
+
+    if (addr_or_undefined !== undefined) {
+      return addr_or_undefined;
+    }
+
     const addr = this.allocate(Tag.STRING, 0);
-    this.heap.setInt32(addr * WORD_SIZE + 4, hash);
+    
+    // add the string to the string pool
+    this.stringPool[hash] = [addr, str];
+
+    this.setWord(addr + 1, hash);
     return addr;
   }
 
   // environments are represented as a tagged pointer.
   // they have children corresponding to the frames in the environment.
   allocateEnvironment(frames: number): number {
-    // todo: additional logic for children beyond the first 8
-    return this.allocate(Tag.ENVIRONMENT, frames);
+    // check the size of the environment - how many extensions do we need?
+    let addr: number;
+    if (frames > 8) {
+      // allocate the extensions
+      addr = this.allocate(Tag.ENVIRONMENT, 9);
+      // mark the address first, just in case we need to GC later
+      this.mark(addr);
+      // set the first 8 children to UNALLOCATED
+      for (let i = 1; i <= 8; i++) {
+        this.setWord(addr + i, this.Unallocated);
+      }
+      // allocate the extensions
+      let working = addr;
+      let sizeLeft = frames - 8;
+      while (sizeLeft > 0) {
+        // allocate a single extension
+        const ext = this.allocateExtension(sizeLeft > 8 ? 9 : sizeLeft);
+        // mark the extension
+        this.mark(ext);
+        // set the extension node to the working node
+        this.setWord(working + 9, ext);
+        // set every child of the extension to UNALLOCATED
+        for (let i = 1; i <= 8; i++) {
+          this.setWord(ext + i, this.Unallocated);
+        }
+        // traverse down the extension node
+        working = ext;
+        sizeLeft -= 8;
+      }
+      // set the last extension node to UNALLOCATED
+      this.setWord(working + 9, this.Unallocated);
+      // unmark the address
+      this.unmark(addr);
+      working = addr;
+      // traverse down to the last extension node, unmarking as we go
+      while (this.getTag(working) === Tag.EXTENSION) {
+        this.unmark(working);
+        working = this.getWord(working + 9);
+      }
+    } else {
+      addr = this.allocate(Tag.ENVIRONMENT, frames);
+      // set the children to UNALLOCATED
+      for (let i = 1; i <= frames; i++) {
+        this.setWord(addr + i, this.Unallocated);
+      }
+    }
+    return addr;
   }
 
   // frames are represented as a tagged pointer.
   // they have children corresponding to the bindings in the frame.
   allocateFrame(bindings: number): number {
-    // todo: additional logic for children beyond the first 8
-    return this.allocate(Tag.FRAME, bindings);
+    // check the size of the frame - how many extensions do we need?
+    let addr: number;
+    if (bindings > 8) {
+      // allocate the extensions
+      addr = this.allocate(Tag.FRAME, 9);
+      // mark the address first, just in case we need to GC later
+      this.mark(addr);
+      // set the first 8 children to UNALLOCATED
+      for (let i = 1; i <= 8; i++) {
+        this.setWord(addr + i, this.Unallocated);
+      }
+      // allocate the extensions
+      let working = addr;
+      let sizeLeft = bindings - 8;
+      while (sizeLeft > 0) {
+        // allocate a single extension
+        const ext = this.allocateExtension(sizeLeft > 8 ? 9 : sizeLeft);
+        // mark the extension
+        this.mark(ext);
+        // set the extension node to the working node
+        this.setWord(working + 9, ext);
+        // set every child of the extension to UNALLOCATED
+        for (let i = 1; i <= 8; i++) {
+          this.setWord(ext + i, this.Unallocated);
+        }
+        // traverse down the extension node
+        working = ext;
+        sizeLeft -= 8;
+      }
+      // set the last extension node to UNALLOCATED
+      this.setWord(working + 9, this.Unallocated);
+      // unmark the address
+      this.unmark(addr);
+      working = addr;
+      // traverse down to the last extension node, unmarking as we go
+      while (this.getTag(working) === Tag.EXTENSION) {
+        this.unmark(working);
+        working = this.getWord(working + 9);
+      }
+    } else {
+      addr = this.allocate(Tag.FRAME, bindings);
+      // set the children to UNALLOCATED
+      for (let i = 1; i <= bindings; i++) {
+        this.setWord(addr + i, this.Unallocated);
+      }
+    }
+    return addr;
   }
 
   // block frames are represented as a tagged pointer, with
@@ -411,5 +604,20 @@ export class Heap {
   // children corresponding to the fields in the extension.
   allocateExtension(children: number): number {
     return this.allocate(Tag.EXTENSION, children);
+  }
+
+  // wait sends are tracked by goroutines, and represent the items the goroutines are waiting on.
+  // they have one child, which points to the channel they are waiting on.
+  allocateWaitSend(chan: number): number {
+    const addr = this.allocate(Tag.WAIT_SEND, 1);
+    this.setWord(addr + 1, chan);
+    return addr;
+  }
+
+  // similar idea for wait receives.
+  allocateWaitReceive(chan: number): number {
+    const addr = this.allocate(Tag.WAIT_RECEIVE, 1);
+    this.setWord(addr + 1, chan);
+    return addr;
   }
 }
