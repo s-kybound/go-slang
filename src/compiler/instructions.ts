@@ -4,6 +4,8 @@
 
 import { Value } from "../types";
 
+import { compileTimeEnvPosition } from "./compiler";
+
 export enum InstrType {
   LDC,
   UNOP,
@@ -77,21 +79,23 @@ export interface GOTOInstr extends BaseInstr {
 }
 
 export interface ENTER_SCOPEInstr extends BaseInstr {
-  syms: string[];
+  syms: number;
 }
 
 export interface EXIT_SCOPEInstr extends BaseInstr {}
 
 export interface LDInstr extends BaseInstr {
   name: string;
+  pos: compileTimeEnvPosition;
 }
 
 export interface ASSIGNInstr extends BaseInstr {
   name: string;
+  pos: compileTimeEnvPosition;
 }
 
 export interface LDFInstr extends BaseInstr {
-  params: any[];
+  arity: number;
   addr: number;
 }
 

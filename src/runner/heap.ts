@@ -1,3 +1,5 @@
+import { stdlib, constants, Stdlib, Constants } from "../stdlib";
+
 // a representation of the heap, which stores all data in the program.
 // for go-slang, we use a fixed-size big-endian heap 
 // using tagged pointers that uses
@@ -84,6 +86,9 @@ export class Heap {
   Unallocated: number;
   globalEnv: number;
 
+  // set of builtins, represented with [arity, function]
+  builtins: [number, Function][] = [];
+
   // constructor for the heap.
   // remember that the size is given in bytes.
   private constructor(size: number) {
@@ -101,7 +106,12 @@ export class Heap {
     this.setFreePointerAtAddress(i, -1);
 
     // allocate the global environment
-    this.initGlobalEnv();
+    this.False = this.allocate(Tag.FALSE, 0);
+    this.True = this.allocate(Tag.TRUE, 0);
+    this.Null = this.allocate(Tag.NULL, 0);
+    this.Undefined = this.allocate(Tag.UNDEFINED, 0);
+    this.Unallocated = this.allocate(Tag.UNALLOCATED, 0);
+    this.globalEnv = this.initGlobalEnvironment();
   }
 
   // create a new heap with a size given in megabytes.
@@ -115,12 +125,36 @@ export class Heap {
     return new Heap(size);
   }
 
+  private initGlobalEnvironment(): number {
+    // get the total number of objects in the stdlib and constants
+    const total = Object.keys(stdlib).length + Object.keys(constants).length;
+    // allocate a single frame
+    const frame = this.allocateFrame(total);
+    // set the bindings in the frame
+    let i = 0;
+    for (const key in stdlib) {
+      this.builtins[i] = stdlib[key as keyof Stdlib];
+      const builtin = this.allocateBuiltin(i);
+      this.setFrameValue(frame, i, builtin);
+      i++;
+    }
+    for (const key in constants) {
+      this.setFrameValue(frame, i, this.valueToAddress(constants[key as keyof Constants]));
+      i++;
+    }
+    // allocate the global environment
+    const addr = this.allocateEnvironment(1);
+    // set the first frame in the environment
+    this.setWord(addr + 1, frame);
+    return addr;
+  }
+
   setWord(address: number, value: number) {
-    this.heap.setFloat64(address * WORD_SIZE + 8, value);
+    this.heap.setFloat64(address * WORD_SIZE, value);
   }
 
   getWord(address: number): number {
-    return this.heap.getFloat64(address * WORD_SIZE + 8);
+    return this.heap.getFloat64(address * WORD_SIZE);
   }
 
   setByteAtOffset(address: number, offset: number, value: number) {
@@ -145,7 +179,8 @@ export class Heap {
   }
 
   getFreePointerAtAddress(address: number): number {
-    if (this.isFree(address)) {
+    if (!this.isFree(address)) {
+      const tag = this.getTag(60);
       throw new Error("Not a free pointer");
     }
     return this.heap.getInt32(address * WORD_SIZE + 4);
@@ -321,20 +356,6 @@ export class Heap {
     return this.getTag(address) === Tag.WAIT_RECEIVE;
   }
 
-  // On literals:
-  // there will only ever be a single instance of true, false,
-  // null, undefined, and the UNALLOCATED object, defined in the heap.
-  // these all have no children, and will only be recognised by their tag.
-  private initGlobalEnv() {
-    this.False = this.allocate(Tag.FALSE, 0);
-    this.True = this.allocate(Tag.TRUE, 0);
-    this.Null = this.allocate(Tag.NULL, 0);
-    this.Undefined = this.allocate(Tag.UNDEFINED, 0);
-    this.Unallocated = this.allocate(Tag.UNALLOCATED, 0);
-    // TODO: implement the builtins and literals here
-    this.globalEnv = this.allocate(Tag.ENVIRONMENT, 0);
-  }
-
   // numbers are represented as a tagged pointer with the number
   // as the second word.
   // there are no children.
@@ -355,14 +376,23 @@ export class Heap {
   }
 
   channelIsFull(chan: number): boolean {
+    if (!this.isChan(chan)) {
+      throw new Error("Not a channel");
+    }
     return this.getWord(chan + 1) === this.True;
   }
 
   channelIsEmpty(chan: number): boolean {
+    if (!this.isChan(chan)) {
+      throw new Error("Not a channel");
+    }
     return this.getWord(chan + 1) === this.False;
   }
 
   channelPopItem(chan: number): number {
+    if (!this.isChan(chan)) {
+      throw new Error("Not a channel");
+    }
     if (this.channelIsEmpty(chan)) {
       throw new Error("Channel is empty");
     }
@@ -373,6 +403,9 @@ export class Heap {
   }
 
   channelPushItem(chan: number, item: number) {
+    if (!this.isChan(chan)) {
+      throw new Error("Not a channel");
+    }
     if (this.channelIsFull(chan)) {
       throw new Error("Channel is full");
     }
@@ -427,10 +460,10 @@ export class Heap {
       this.unmark(addr);
       working = addr;
       // traverse down to the last extension node, unmarking as we go
-      while (this.getTag(working) === Tag.EXTENSION) {
+      do {
         this.unmark(working);
         working = this.getWord(working + 9);
-      }
+      } while (this.getTag(working) === Tag.EXTENSION) 
     } else {
       addr = this.allocate(Tag.ARRAY, size);
       // set the children to UNALLOCATED
@@ -469,11 +502,24 @@ export class Heap {
   }
 
   getClosureArity(closure: number): number {
+    if (!this.isClosure(closure)) {
+      throw new Error("Not a closure");
+    }
     return this.heap.getInt16(closure * WORD_SIZE + 4);
   }
 
   getClosurePC(closure: number): number {
+    if (!this.isClosure(closure)) {
+      throw new Error("Not a closure");
+    }
     return this.heap.getInt16(closure * WORD_SIZE + 6);
+  }
+
+  getClosureEnv(closure: number): number {
+    if (!this.isClosure(closure)) {
+      throw new Error("Not a closure");
+    }
+    return this.getWord(closure + 1);
   }
 
   // builtins are represented as a tagged pointer.
@@ -483,6 +529,20 @@ export class Heap {
     const addr = this.allocate(Tag.BUILTIN, 0);
     this.heap.setInt32(addr * WORD_SIZE + 4, id);
     return addr;
+  }
+
+  getBuiltinArity(addr: number): number {
+    if (!this.isBuiltin(addr)) {
+      throw new Error("Not a builtin");
+    }
+    return this.builtins[this.heap.getInt32(addr * WORD_SIZE + 4)][0];
+  }
+
+  getBuiltinFunction(addr: number): Function {
+    if (!this.isBuiltin(addr)) {
+      throw new Error("Not a builtin");
+    }
+    return this.builtins[this.heap.getInt32(addr * WORD_SIZE + 4)][1];
   }
 
   hashString(str: string): number {
@@ -522,6 +582,9 @@ export class Heap {
   }
 
   getString(address: number): string {
+    if (!this.isString(address)) {
+      throw new Error("Not a string");
+    }
     const hash = this.getWord(address + 1);
     return this.stringPool[hash][1];
   }
@@ -564,10 +627,10 @@ export class Heap {
       this.unmark(addr);
       working = addr;
       // traverse down to the last extension node, unmarking as we go
-      while (this.getTag(working) === Tag.EXTENSION) {
+      do {
         this.unmark(working);
         working = this.getWord(working + 9);
-      }
+      } while (this.getTag(working) === Tag.EXTENSION) 
     } else {
       addr = this.allocate(Tag.ENVIRONMENT, frames);
       // set the children to UNALLOCATED
@@ -580,6 +643,12 @@ export class Heap {
 
   // allocate a new environment, given a parent environment and a frame.
   extendEnvironment(env: number, frame: number): number {
+    if (!this.isEnvironment(env)) {
+      throw new Error("Not an environment");
+    }
+    if (!this.isFrame(frame)) {
+      throw new Error("Not a frame");
+    }
     // first, allocate a new environment
     const addr = this.allocateEnvironment(0);
 
@@ -618,6 +687,8 @@ export class Heap {
         this.setWord(ext + i, frame);
         return addr;
       }
+      // case 2
+
       // we need to allocate yet another node
       let ext = this.allocateExtension(9);
       this.setWord(newWorking + 9, ext);
@@ -635,6 +706,9 @@ export class Heap {
     // there's no need to reason about extensions.
     // just set the new frame to the next child of the environment.
     const children = this.getNumChildren(env);
+    for (let i = 1; i <= children; i++) {
+      this.setWord(addr + i, this.getWord(env + i));
+    }
     this.setWord(addr + children + 1, frame);
     this.setNumChildren(addr, children + 1);
     return addr;
@@ -644,6 +718,9 @@ export class Heap {
   // the index is represented by [frame index, binding index]
   // both are 0-indexed.
   getEnvironmentValue(env: number, index: [number, number]): number {
+    if (!this.isEnvironment(env)) {
+      throw new Error("Not an environment");
+    }
     let [frameIndex, bindingIndex] = index;
     // get the correct frame
     let working = env;
@@ -660,6 +737,9 @@ export class Heap {
   // the index is represented by [frame index, binding index]
   // both are 0-indexed.
   setEnvironmentValue(env: number, index: [number, number], value: number) {
+    if (!this.isEnvironment(env)) {
+      throw new Error("Not an environment");
+    }
     let [frameIndex, bindingIndex] = index;
     // get the correct frame
     let working = env;
@@ -694,6 +774,7 @@ export class Heap {
         const ext = this.allocateExtension(sizeLeft > 8 ? 9 : sizeLeft);
         // mark the extension
         this.mark(ext);
+         
         // set the extension node to the working node
         this.setWord(working + 9, ext);
         // set every child of the extension to UNALLOCATED
@@ -710,10 +791,10 @@ export class Heap {
       this.unmark(addr);
       working = addr;
       // traverse down to the last extension node, unmarking as we go
-      while (this.getTag(working) === Tag.EXTENSION) {
+      do {
         this.unmark(working);
         working = this.getWord(working + 9);
-      }
+      } while (this.getTag(working) === Tag.EXTENSION);
     } else {
       addr = this.allocate(Tag.FRAME, bindings);
       // set the children to UNALLOCATED
@@ -727,6 +808,9 @@ export class Heap {
   // get the value at a given index in the frame.
   // index is 0-indexed.
   getFrameValue(frame: number, index: number): number {
+    if (!this.isFrame(frame)) {
+      throw new Error("Not a frame");
+    }
     // if index is more than 7, we need to traverse down the extension nodes
     let working = frame;
     while (index > 7) {
@@ -734,12 +818,16 @@ export class Heap {
       index -= 8;
     }
     // working now points to the correct node
+
     return this.getWord(working + index + 1);
   }
 
   // set the value at a given index in the frame.
   // index is 0-indexed.
   setFrameValue(frame: number, index: number, value: number) {
+    if (!this.isFrame(frame)) {
+      throw new Error("Not a frame");
+    }
     // if index is more than 7, we need to traverse down the extension nodes
     let working = frame;
     while (index > 7) {
@@ -747,6 +835,7 @@ export class Heap {
       index -= 8;
     }
     // working now points to the correct node
+
     this.setWord(working + index + 1, value);
   }
 
@@ -759,6 +848,9 @@ export class Heap {
   }
 
   getBlockFrameEnv(blockFrame: number): number {
+    if (!this.isBlockFrame(blockFrame)) {
+      throw new Error("Not a block frame");
+    }
     return this.getWord(blockFrame + 1);
   }
 
@@ -772,10 +864,16 @@ export class Heap {
   }
 
   getCallFrameEnv(callFrame: number): number {
+    if (!this.isCallFrame(callFrame)) {
+      throw new Error("Not a call frame");
+    }
     return this.getWord(callFrame + 1);
   }
 
   getCallFramePC(callFrame: number): number {
+    if (!this.isCallFrame(callFrame)) {
+      throw new Error("Not a call frame");
+    }
     return this.getWord(callFrame + 2);
   }
 
@@ -793,11 +891,25 @@ export class Heap {
     return addr;
   }
 
+  getWaitSendChan(waitSend: number): number {
+    if (!this.isWaitSend(waitSend)) {
+      throw new Error("Not a wait send");
+    }
+    return this.getWord(waitSend + 1);
+  }
+
   // similar idea for wait receives.
   allocateWaitReceive(chan: number): number {
     const addr = this.allocate(Tag.WAIT_RECEIVE, 1);
     this.setWord(addr + 1, chan);
     return addr;
+  }
+
+  getWaitReceiveChan(waitReceive: number): number {
+    if (!this.isWaitReceive(waitReceive)) {
+      throw new Error("Not a wait receive");
+    }
+    return this.getWord(waitReceive + 1);
   }
 
   valueToAddress(value: any): number {
@@ -836,5 +948,70 @@ export class Heap {
       return undefined;
     }
     throw new Error("Unsupported address");
+  }
+
+  // debug
+
+  // for debugging: return a string that shows the bits
+  // of a given word
+  word_to_string = (word: number) => {
+    const buf = new ArrayBuffer(8);
+    const view = new DataView(buf);
+    view.setFloat64(0, word);
+    let binStr = '';
+    for (let i = 0; i < 8; i++) {
+        binStr += ('00000000' +
+                   view.getUint8(i).toString(2)).slice(-8) +
+                   ' ';
+    }
+    return binStr
+  }
+
+  typeOfTag(tag: Tag): string {
+    switch (tag) {
+      case Tag.FALSE:
+      case Tag.TRUE:
+        return "boolean";
+      case Tag.NUMBER:
+        return "number";
+      case Tag.NULL:
+        return "null";
+      case Tag.UNDEFINED:
+        return "undefined";
+      case Tag.CHAN:
+        return "channel";
+      case Tag.STRUCT:
+        return "struct";
+      case Tag.ARRAY:
+        return "array";
+      case Tag.SLICE:
+        return "slice";
+      case Tag.CLOSURE:
+        return "closure";
+      case Tag.BUILTIN:
+        return "builtin";
+      case Tag.STRING:
+        return "string";
+      case Tag.ENVIRONMENT:
+        return "environment";
+      case Tag.FRAME:
+        return "frame";
+      case Tag.BLOCKFRAME:
+        return "block frame";
+      case Tag.CALLFRAME:
+        return "call frame";
+      case Tag.EXTENSION:
+        return "extension";
+      case Tag.WAIT_SEND:
+        return "wait send";
+      case Tag.WAIT_RECEIVE:
+        return "wait receive";
+      case Tag.FREE:
+        return "free";
+      case Tag.UNALLOCATED:
+        return "unallocated";
+      default:
+        return "unknown";
+    }
   }
 }

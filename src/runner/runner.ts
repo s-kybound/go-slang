@@ -1,14 +1,13 @@
 import * as instr from "../compiler/instructions";
-import { Goroutine, NormalGoroutine } from "./goroutines/goroutine";
-import { Environment, globalEnvironment } from "./env";
+import { Goroutine } from "./goroutines/goroutine";
 import { Heap } from "./heap";
 export class Runner {
   private readonly instructions: instr.Instr[];
 
   // treated as a circular list of goroutines to run.
   private readonly goroutines: Goroutine[];
-  private readonly programEnvironment = globalEnvironment.extend();
-  private readonly mainGoroutine: NormalGoroutine;
+  private readonly programEnvironment;
+  private readonly mainGoroutine: Goroutine;
   private readonly heap;
   private currGoroutine: number;
   private time: number = 0;
@@ -25,22 +24,27 @@ export class Runner {
   constructor(instructions: instr.Instr[], quantum: number, size: number) {
     this.instructions = instructions;
     this.quantum = quantum;
-    this.mainGoroutine = new NormalGoroutine(0, this, this.instructions, this.programEnvironment);
+    this.heap = Heap.create(size);
+    this.programEnvironment = this.heap.globalEnv;
+    this.mainGoroutine = new Goroutine(0, this, this.instructions, this.programEnvironment);
     this.goroutines = [this.mainGoroutine];
     this.currGoroutine = 0;
-    this.heap = Heap.create(size);
   }
 
   getInstructions() {
     return this.instructions;
   }
 
+  getHeap() {
+    return this.heap;
+  }
+
   addGoroutine(g: Goroutine) {
     this.goroutines.push(g);
   }
 
-  launchThread(pc: number, e: Environment) {
-    const newGoroutine = new NormalGoroutine(pc, this, this.instructions, e);
+  launchThread(pc: number, e: number) {
+    const newGoroutine = new Goroutine(pc, this, this.instructions, e);
     this.goroutines.push(newGoroutine);
   }
 

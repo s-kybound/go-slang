@@ -25,9 +25,10 @@ func fibonacci(c, quit chan int) {
 }
 
 func main() {
-	c := makeChannel();
-	quit := makeChannel();
-	funisdone := makeChannel();
+	display("Hello, World!");
+	c := make_channel();
+	quit := make_channel();
+	funisdone := make_channel();
 	go func() {
 		for i := 0; i < 10; i = i + 1 {
 			display(<-c);
@@ -51,4 +52,5 @@ const instructions = compiler.getInstrs();
 const QUANTUM = 22;
 
 const runner = new Runner(instructions, QUANTUM, 4);
+
 runner.run();

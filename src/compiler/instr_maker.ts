@@ -27,6 +27,8 @@ import {
   CLEAR_WAITInstr
 } from "./instructions"
 
+import { compileTimeEnvPosition } from "./compiler";
+
 export function makeLDCInstr(value: Value): LDCInstr {
   return { type: InstrType.LDC, value: value }
 }
@@ -51,24 +53,24 @@ export function makeGOTOInstr(addr: number): GOTOInstr {
   return { type: InstrType.GOTO, addr: addr }
 }
 
-export function makeENTER_SCOPEInstr(locals: string[]): ENTER_SCOPEInstr {
-  return { type: InstrType.ENTER_SCOPE, syms: locals }
+export function makeENTER_SCOPEInstr(syms: number): ENTER_SCOPEInstr {
+  return { type: InstrType.ENTER_SCOPE, syms: syms }
 }
 
 export function makeEXIT_SCOPEInstr(): EXIT_SCOPEInstr {
   return { type: InstrType.EXIT_SCOPE }
 }
 
-export function makeLDInstr(name: string): LDInstr {
-  return { type: InstrType.LD, name: name }
+export function makeLDInstr(name: string, pos: compileTimeEnvPosition): LDInstr {
+  return { type: InstrType.LD, name: name, pos: pos}
 }
 
-export function makeASSIGNInstr(name: string): ASSIGNInstr {
-  return { type: InstrType.ASSIGN, name: name }
+export function makeASSIGNInstr(name: string, pos: compileTimeEnvPosition): ASSIGNInstr {
+  return { type: InstrType.ASSIGN, name: name, pos: pos}
 }
 
-export function makeLDFInstr(params: any[], addr: number): LDFInstr {
-  return { type: InstrType.LDF, params: params, addr: addr }
+export function makeLDFInstr(arity: number, addr: number): LDFInstr {
+  return { type: InstrType.LDF, arity: arity, addr: addr }
 }
 
 export function makeCALLInstr(arity: number): CALLInstr {
