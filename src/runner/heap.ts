@@ -99,6 +99,10 @@ export class Heap {
     return new Heap(size);
   }
 
+  setWord(address: number, value: number) {
+    this.heap.setFloat64(address * WORD_SIZE + 8, value);
+  }
+
   setByteAtOffset(address: number, offset: number, value: number) {
     this.heap.setUint8(address * WORD_SIZE + offset, value);
   }
@@ -121,7 +125,7 @@ export class Heap {
   }
 
   getFreePointerAtAddress(address: number): number {
-    if (this.getTag(address) !== Tag.FREE) {
+    if (this.isFree(address)) {
       throw new Error("Not a free pointer");
     }
     return this.heap.getInt32(address * WORD_SIZE + 4);
@@ -136,11 +140,11 @@ export class Heap {
     return this.getByteAtOffset(address, 0) as Tag;
   }
 
-  set_num_children(address: number, children: number) {
+  setNumChildren(address: number, children: number) {
     this.set2BytesAtOffset(address, 2, children);
   }
 
-  get_num_children(address: number): number {
+  getNumChildren(address: number): number {
     return this.get2BytesAtOffset(address, 2);
   }
 
@@ -166,7 +170,7 @@ export class Heap {
     this.unmark(newNode);
 
     // set the number of children of the new node
-    this.set_num_children(newNode, children);
+    this.setNumChildren(newNode, children);
 
     return newNode;
   }
@@ -195,7 +199,8 @@ export class Heap {
     // start at the first address
     let current = 0;
     while (current * WORD_SIZE < this.heap.byteLength) {
-      if (!this.isMarked(current)) {
+      // only free the node if it is NOT free, and NOT marked
+      if (!this.isMarked(current) && !this.isFree(current)) {
         // if the first node is unmarked, we free it.
         this.free(current);
       }
@@ -205,5 +210,206 @@ export class Heap {
   garbageCollect() {
     // mark and sweep algorithm
     throw new Error("Not implemented");
+  }
+
+  // data type predicates
+  isFree(address: number): boolean {
+    return this.getTag(address) === Tag.FREE;
+  }
+
+  isUnallocated(address: number): boolean {
+    return this.getTag(address) === Tag.UNALLOCATED;
+  }
+
+  isFalse(address: number): boolean {
+    return this.getTag(address) === Tag.FALSE;
+  }
+  
+  isTrue(address: number): boolean {
+    return this.getTag(address) === Tag.TRUE;
+  }
+
+  isBoolean(address: number): boolean {
+    return this.isFalse(address) || this.isTrue(address);
+  }
+
+  isNull(address: number): boolean {
+    return this.getTag(address) === Tag.NULL;
+  }
+
+  isUndefined(address: number): boolean {
+    return this.getTag(address) === Tag.UNDEFINED;
+  }
+
+  isChan(address: number): boolean {
+    return this.getTag(address) === Tag.CHAN;
+  }
+
+  isStruct(address: number): boolean {
+    return this.getTag(address) === Tag.STRUCT;
+  }
+
+  isArray(address: number): boolean {
+    return this.getTag(address) === Tag.ARRAY;
+  }
+
+  isSlice(address: number): boolean {
+    return this.getTag(address) === Tag.SLICE;
+  }
+
+  isClosure(address: number): boolean {
+    return this.getTag(address) === Tag.CLOSURE;
+  }
+
+  isBuiltin(address: number): boolean {
+    return this.getTag(address) === Tag.BUILTIN;
+  }
+
+  isString(address: number): boolean {
+    return this.getTag(address) === Tag.STRING;
+  }
+
+  isEnvironment(address: number): boolean {
+    return this.getTag(address) === Tag.ENVIRONMENT;
+  }
+
+  isFrame(address: number): boolean {
+    return this.getTag(address) === Tag.FRAME;
+  }
+
+  isBlockFrame(address: number): boolean {
+    return this.getTag(address) === Tag.BLOCKFRAME;
+  }
+
+  isCallFrame(address: number): boolean {
+    return this.getTag(address) === Tag.CALLFRAME;
+  }
+
+  isExtension(address: number): boolean {
+    return this.getTag(address) === Tag.EXTENSION;
+  }
+
+  // On literals:
+  // there will only ever be a single instance of true, false,
+  // null, undefined, and the UNALLOCATED object, defined in the heap.
+  // these all have no children, and will only be recognised by their tag.
+  createGlobalEnv(): number {
+    // TODO: implement the builtins and literals here
+    return this.allocate(Tag.ENVIRONMENT, 0);
+  }
+
+  // numbers are represented as a tagged pointer with the number
+  // as the second word.
+  // there are no children.
+  allocateNumber(value: number): number {
+    const address = this.allocate(Tag.NUMBER, 0);
+    this.setWord(address + 1, value);
+    return address;
+  }
+
+  // channels are represented as a tagged pointer. 
+  // they have 2 children: hasItem, which points to either
+  // FALSE or TRUE, and item, which points to the item in the channel.
+  allocateChannel(): number {
+    // TODO: implement the 2 children
+    return this.allocate(Tag.CHAN, 2);
+  }
+
+  // structs - dont know yet
+  // most likely a tagged pointer with children pointing to the fields
+  // of the struct.
+  allocateStruct(): number {
+    return this.allocate(Tag.STRUCT, 0);
+  }
+
+  // arrays are represented as a tagged pointer.
+  // they have children which correspond to the given size of the
+  // array.
+  // the metadata consists of the size of the array.
+  allocateArray(size: number): number {
+    // TODO: addional logic for children + extension
+    const addr = this.allocate(Tag.ARRAY, size);
+    // set the last 4 bytes to the size of the array
+    this.heap.setInt32(addr * WORD_SIZE + 4, size);
+    return addr;
+  }
+
+  // slices are represented as a tagged pointer.
+  // they have 1 child, which points to the array.
+  // or perhaps we need more children corresponding to the size of
+  // the slice?
+  allocateSlice(arr: number): number {
+    const addr = this.allocate(Tag.SLICE, 1);
+    this.setWord(addr + 1, arr);
+    return addr;
+  }
+
+  // closures are represented as a tagged pointer.
+  // the metadata consists of the arity of the closure,
+  // and the pc of the closure, both represented with Int16.
+  // metadata: [arity: 2 bytes] [pc: 2 bytes]
+  // they have 1 child, pointing to the environment of the closure.
+  allocateClosure(arity: number, pc: number, e: number): number {
+    const addr = this.allocate(Tag.CLOSURE, 1);
+    this.heap.setInt16(addr * WORD_SIZE + 4, arity);
+    this.heap.setInt16(addr * WORD_SIZE + 6, pc);
+    // set the env here
+    this.setWord(addr + 1, e);
+    return addr;
+  }
+
+  // builtins are represented as a tagged pointer.
+  // they have no children.
+  // the metadata consists of the id of the builtin to call.
+  allocateBuiltin(id: number): number {
+    const addr = this.allocate(Tag.BUILTIN, 0);
+    this.heap.setInt32(addr * WORD_SIZE + 4, id);
+    return addr;
+  }
+
+  // strings have no children,
+  // and have a hash corresponding to the string hash in the string pool.
+  allocateString(str: string): number {
+    // todo: implement the hash function plus the string pool
+    const hash = 0;
+    const addr = this.allocate(Tag.STRING, 0);
+    this.heap.setInt32(addr * WORD_SIZE + 4, hash);
+    return addr;
+  }
+
+  // environments are represented as a tagged pointer.
+  // they have children corresponding to the frames in the environment.
+  allocateEnvironment(frames: number): number {
+    // todo: additional logic for children beyond the first 8
+    return this.allocate(Tag.ENVIRONMENT, frames);
+  }
+
+  // frames are represented as a tagged pointer.
+  // they have children corresponding to the bindings in the frame.
+  allocateFrame(bindings: number): number {
+    // todo: additional logic for children beyond the first 8
+    return this.allocate(Tag.FRAME, bindings);
+  }
+
+  // block frames are represented as a tagged pointer, with
+  // the environment of the block frame as the single child.
+  allocateBlockFrame(env: number): number {
+    const addr = this.allocate(Tag.BLOCKFRAME, 1);
+    this.setWord(addr + 1, env);
+    return addr;
+  }
+
+  // call frames are represented as a tagged pointer, with
+  // the environment of the call frame as the single child.
+  allocateCallFrame(env: number): number {
+    const addr = this.allocate(Tag.CALLFRAME, 1);
+    this.setWord(addr + 1, env);
+    return addr;
+  }
+
+  // extension frames are represented as a tagged pointer, with
+  // children corresponding to the fields in the extension.
+  allocateExtension(children: number): number {
+    return this.allocate(Tag.EXTENSION, children);
   }
 }

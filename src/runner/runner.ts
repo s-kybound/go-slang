@@ -1,8 +1,7 @@
 import * as instr from "../compiler/instructions";
 import { Goroutine, NormalGoroutine } from "./goroutines/goroutine";
 import { Environment, globalEnvironment } from "./env";
-import { GarbageCollector } from "./goroutines/special_goroutines";
-
+import { Heap } from "./heap";
 export class Runner {
   private readonly instructions: instr.Instr[];
 
@@ -10,12 +9,9 @@ export class Runner {
   private readonly goroutines: Goroutine[];
   private readonly programEnvironment = globalEnvironment.extend();
   private readonly mainGoroutine: NormalGoroutine;
+  private readonly heap;
   private currGoroutine: number;
   private time: number = 0;
-
-  // memory is represented as a shared array buffer. All goroutines will share the same SharedArrayBuffer, but use internal
-  // dataviews to track the data in the buffer.
-  private memory: SharedArrayBuffer;
 
   // quantum of time to run each goroutine.
   private readonly quantum: number;
@@ -32,11 +28,7 @@ export class Runner {
     this.mainGoroutine = new NormalGoroutine(0, this, this.instructions, this.programEnvironment);
     this.goroutines = [this.mainGoroutine];
     this.currGoroutine = 0;
-    const megabytes = 2 ** 20;
-    this.memory = new SharedArrayBuffer(size * (2 ** 20));
-    // the first 4 bytes of the memory are reserved to store the free pointer of the memory.
-    const freePointer = new DataView(this.memory);
-    freePointer.setInt32(0, 4);
+    this.heap = Heap.create(size);
   }
 
   getInstructions() {
