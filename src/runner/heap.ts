@@ -25,7 +25,23 @@ const WORD_SIZE = 8;
 const NODE_SIZE = 10;
 
 export class Heap {
+  // TAGGED POINTER CONVENTION
+  // the first word of each node is the tagged pointer itself.
+  // the first byte of the word is the tag.
+  // the next byte is reserved for garbage collection.
+  // the next 2 bytes represent the number of children in the node.
+  // the last 4 bytes are reserved for metadata related to the node type.
+
+  // 1: [tag] 1: [gc] 2: [children] 4: [metadata]
+
+  // an unallocated word is represented with a tag and
+  // a next free address, represented as follows: 
+
+  // 1: [UNALLOCATED_TAG] 3: [unused] 4: [next free word address]
+
   private readonly heap: DataView;
+
+  // free pointers are represented by a "linked list" of free nodes.
   private freePointer: number;
 
   // constructor for the heap.
@@ -39,27 +55,16 @@ export class Heap {
     // set every node EXCEPT THE LAST to point to the next node
     for (; (i + NODE_SIZE) * WORD_SIZE < size; i += NODE_SIZE) {
       // set the value of the free pointer to the next free node
-      this.heap.setFloat64(i * WORD_SIZE, i + NODE_SIZE);
+      this.setFreePointerAtAddress(i, i + NODE_SIZE);
     }
     // finally, set the last free pointer to -1
-    this.heap.setFloat64(i * WORD_SIZE, -1);
+    this.setFreePointerAtAddress(i, -1);
   }
 
   // create a new heap with a size given in megabytes.
   static create(size: number): Heap {
     return new Heap(size * MEGABYTE);
   }
-
-  // TAGGED POINTER CONVENTION
-  // the first word of each node is the tagged pointer itself.
-  // the first byte of the word is the tag.
-  // the next byte is reserved for garbage collection.
-  // the next 2 bytes represent the number of children in the node.
-  // the last 4 bytes are reserved for metadata related to the node type.
-
-  // 1: [tag] 1: [gc] 2: [children] 4: [metadata]
-  // an unallocated word is represented with an double (Float64), 
-  // pointing to the very next free word address.
 
   setByteAtOffset(address: number, offset: number, value: number) {
     this.heap.setUint8(address * WORD_SIZE + offset, value);
@@ -77,6 +82,15 @@ export class Heap {
     return this.heap.getUint16(address * WORD_SIZE + offset);
   }
 
+  setFreePointerAtAddress(address: number, next: number) {
+    // todo - add free tag
+    this.heap.setInt32(address * WORD_SIZE + 4, next);
+  }
+
+  getFreePointerAtAddress(address: number): number {
+    return this.heap.getInt32(address * WORD_SIZE + 4);
+  }
+
   // the accessors for the tagged pointer
   setTag(address: number, tag: number) {
     this.setByteAtOffset(address, 0, tag);
@@ -84,14 +98,6 @@ export class Heap {
 
   getTag(address: number): number {
     return this.getByteAtOffset(address, 0);
-  }
-
-  mark(address: number) {
-    this.setByteAtOffset(address, 1, 1);
-  }
-
-  unmark(address: number) {
-    this.setByteAtOffset(address, 1, 0);
   }
 
   set_num_children(address: number, children: number) {
@@ -108,7 +114,7 @@ export class Heap {
     // get the current free pointer from the heap
     const newNode = this.freePointer;
     // get the next free pointer from the free pointer's position
-    this.freePointer = this.heap.getFloat64(this.freePointer, true);
+    this.freePointer = this.getFreePointerAtAddress(newNode);
     if (this.freePointer === -1) {
       // this is where we need to do GC
       this.garbageCollect();
@@ -122,11 +128,42 @@ export class Heap {
 
     // ensure it is unmarked
     this.unmark(newNode);
-    
+
     // set the number of children of the new node
     this.set_num_children(newNode, children);
 
     return newNode;
+  }
+
+  mark(address: number) {
+    this.setByteAtOffset(address, 1, 1);
+  }
+
+  isMarked(address: number): boolean {
+    return this.getByteAtOffset(address, 1) === 1;
+  }
+
+  unmark(address: number) {
+    this.setByteAtOffset(address, 1, 0);
+  }
+
+  free(address: number) {
+    // set the next free pointer to the current free pointer
+    this.setFreePointerAtAddress(address, this.freePointer);
+    // set the current free pointer to the address
+    this.freePointer = address;
+  }
+
+  sweep() {
+    // we sweep through the heap, freeing all unmarked nodes.
+    // start at the first address
+    let current = 0;
+    while (current * WORD_SIZE < this.heap.byteLength) {
+      if (!this.isMarked(current)) {
+        // if the first node is unmarked, we free it.
+        this.free(current);
+      }
+    }
   }
 
   garbageCollect() {
