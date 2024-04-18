@@ -1,0 +1,136 @@
+// a representation of the heap, which stores all data in the program.
+// for go-slang, we use a fixed-size big-endian heap 
+// using tagged pointers that uses
+// a first-fit allocation strategy.
+
+// Garbage collection is done using
+// a mark-and-sweep algorithm.
+
+const MEGABYTE = 2 ** 20;
+
+// for our go-slang, we fix a word size of 8 bytes.
+// additionally, we use word addressing, so addresses
+// given to the heap are in words, not bytes.
+
+const WORD_SIZE = 8;
+
+// for our go-slang, we fix a node size of 10 words.
+// the first word is reserved for the tag header,
+// and the last word is reserved for an "extension" node.
+// this gives each node 8 words to store children, aside from
+// the tag and extension node.
+
+// 1: [tagpointer] 8: [children] 1: [extension-node]
+
+const NODE_SIZE = 10;
+
+export class Heap {
+  private readonly heap: DataView;
+  private freePointer: number;
+
+  // constructor for the heap.
+  // remember that the size is given in bytes.
+  private constructor(size: number) {
+    this.freePointer = 0;
+    this.heap = new DataView(new ArrayBuffer(size));
+
+    // then initialize the free pointers as required
+    let i = 0;
+    // set every node EXCEPT THE LAST to point to the next node
+    for (; (i + NODE_SIZE) * WORD_SIZE < size; i += NODE_SIZE) {
+      // set the value of the free pointer to the next free node
+      this.heap.setFloat64(i * WORD_SIZE, i + NODE_SIZE);
+    }
+    // finally, set the last free pointer to -1
+    this.heap.setFloat64(i * WORD_SIZE, -1);
+  }
+
+  // create a new heap with a size given in megabytes.
+  static create(size: number): Heap {
+    return new Heap(size * MEGABYTE);
+  }
+
+  // TAGGED POINTER CONVENTION
+  // the first word of each node is the tagged pointer itself.
+  // the first byte of the word is the tag.
+  // the next byte is reserved for garbage collection.
+  // the next 2 bytes represent the number of children in the node.
+  // the last 4 bytes are reserved for metadata related to the node type.
+
+  // 1: [tag] 1: [gc] 2: [children] 4: [metadata]
+  // an unallocated word is represented with an double (Float64), 
+  // pointing to the very next free word address.
+
+  setByteAtOffset(address: number, offset: number, value: number) {
+    this.heap.setUint8(address * WORD_SIZE + offset, value);
+  }
+
+  set2BytesAtOffset(address: number, offset: number, value: number) {
+    this.heap.setUint16(address * WORD_SIZE + offset, value);
+  }
+
+  getByteAtOffset(address: number, offset: number): number {
+    return this.heap.getUint8(address * WORD_SIZE + offset);
+  }
+
+  get2BytesAtOffset(address: number, offset: number): number {
+    return this.heap.getUint16(address * WORD_SIZE + offset);
+  }
+
+  // the accessors for the tagged pointer
+  setTag(address: number, tag: number) {
+    this.setByteAtOffset(address, 0, tag);
+  }
+
+  getTag(address: number): number {
+    return this.getByteAtOffset(address, 0);
+  }
+
+  mark(address: number) {
+    this.setByteAtOffset(address, 1, 1);
+  }
+
+  unmark(address: number) {
+    this.setByteAtOffset(address, 1, 0);
+  }
+
+  set_num_children(address: number, children: number) {
+    this.set2BytesAtOffset(address, 2, children);
+  }
+
+  get_num_children(address: number): number {
+    return this.get2BytesAtOffset(address, 2);
+  }
+
+  // allocates a node in the heap, setting the tag and number of children.
+  // returns the address allocated.
+  allocate(tag: number, children: number): number {
+    // get the current free pointer from the heap
+    const newNode = this.freePointer;
+    // get the next free pointer from the free pointer's position
+    this.freePointer = this.heap.getFloat64(this.freePointer, true);
+    if (this.freePointer === -1) {
+      // this is where we need to do GC
+      this.garbageCollect();
+      // if, even after GC, we are out of memory, throw an error
+      if (this.freePointer === -1) {
+        throw new Error("Out of memory");
+      }
+    }
+    // set the tag of the new node
+    this.setTag(newNode, tag);
+
+    // ensure it is unmarked
+    this.unmark(newNode);
+    
+    // set the number of children of the new node
+    this.set_num_children(newNode, children);
+
+    return newNode;
+  }
+
+  garbageCollect() {
+    // mark and sweep algorithm
+    throw new Error("Not implemented");
+  }
+}
