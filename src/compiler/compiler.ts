@@ -24,6 +24,7 @@ import {
 import * as inst from "./instructions";
 
 import * as ast_type from "../go-slang-parser/src/parser_mapper/ast_types";
+import { GoTypeChecker } from "../typechecker/typechecker";
 
 interface CompileFuncs {
   [key: string]: (comp: any) => void;
@@ -34,12 +35,14 @@ export class GoCompiler {
   private instrs: inst.Instr[];
   private compiled: boolean;
   private wc: number;
+  private typeChecker: GoTypeChecker;
 
   constructor(ast: ast_type.Program) {
     this.ast = ast;
     this.instrs = [];
     this.compiled = false;
     this.wc = 0;
+    this.typeChecker = new GoTypeChecker(this.ast);
   }
 
   // compile the ast to instructions.
@@ -48,6 +51,7 @@ export class GoCompiler {
       return;
     }
     this.compileProgram();
+    this.typeChecker.typeCheck();
     this.compiled = true;
   }
 
