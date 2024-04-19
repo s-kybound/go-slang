@@ -4,7 +4,7 @@ import { Runner } from "./runner/runner"
 import { Program } from "./go-slang-parser/src/parser_mapper/ast_types";
 import * as programs from "./programs";
 
-const program = programs.ifStatement;
+const program = programs.fibonacci;
 
 const ast = parse(program) as Program;
 
