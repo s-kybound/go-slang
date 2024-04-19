@@ -183,3 +183,28 @@ func main() {
   return;
 }
 `;
+
+export const makeArray = `
+func main() {
+  a := make_array(10);
+  // the array is currently empty
+  a[0] = 1;
+  a[1] = 2;
+  display(a[0]);
+  display(a[1]);
+  return;
+}
+`;
+
+export const makeArrayStressTest = `
+func main() {
+  a := make_array(1000);
+  for i := 0; i < 1000; i = i + 1 {
+    a[i] = i;
+  }
+  for i := 0; i < 1000; i = i + 1 {
+    display(a[i]);
+  }
+  return;
+}
+`;

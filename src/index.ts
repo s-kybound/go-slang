@@ -2,26 +2,25 @@ import { parse } from "./go-slang-parser/src"
 import { GoCompiler } from "./compiler/compiler"
 import { Runner } from "./runner/runner"
 import { Program } from "./go-slang-parser/src/parser_mapper/ast_types";
-import * as programs from "./programs";
+import { Instr } from "./compiler/instructions";
 
-const program = programs.createStackOverflow;
+export async function compile(program: string): Promise<Instr[]> {
+  const ast = parse(program) as Program;
 
-const ast = parse(program) as Program;
+  const compiler = new GoCompiler(ast);
 
-const compiler = new GoCompiler(ast);
+  compiler.compile();
 
-compiler.compile();
+  return compiler.getInstrs();
+}
 
-const instructions = compiler.getInstrs();
+export async function compile_and_run(
+  program: string,
+  quantum: number, 
+  size: number, 
+  inBytes: boolean): Promise<void> {
 
-// let i = 0;
-// instructions.forEach((instr) => {
-//   console.log(i, instr);
-//   i++;
-// })
-
-const QUANTUM = 22;
-
-const runner = new Runner(instructions, QUANTUM, 8000, true);
-
-runner.run();
+  const instrs = await compile(program);
+  const runner = new Runner(instrs, quantum, size, inBytes);
+  runner.run();
+}

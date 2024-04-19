@@ -601,6 +601,71 @@ export class Heap {
     return addr;
   }
 
+  accessArrayIndex(array: number, index: number): number {
+    if (!this.isArray(array)) {
+      throw new Error("Not an array");
+    }
+    if (!this.isNumber(index)) {
+      throw new Error("Index is not a number");
+    }
+
+    const indexValue = this.addressToValue(index);    
+    const size = this.heap.getInt32(array * WORD_SIZE + 4);
+    if (indexValue >= size) {
+      throw new Error("Index out of bounds");
+    }
+
+    // calculate the extension node to access
+    const nodesAway = Math.floor(indexValue / 8);
+    const offset = indexValue % 8;
+
+    // traverse <nodesAway> nodes down the array
+    let working = array;
+
+    for (let i = 0; i < nodesAway; i++) {
+      if (!(this.isExtension(working) || this.isArray(working))) {
+        throw new Error("Not an array");
+      }
+      working = this.getWord(working + 9);
+    }
+
+    // get the address of the val
+    const val = this.getWord(working + offset + 1);
+    return val;
+  }
+
+  assignArrayIndex(array: number, index: number, value: number) {
+    if (!this.isArray(array)) {
+      throw new Error("Not an array");
+    }
+    if (!this.isNumber(index)) {
+      throw new Error("Index is not a number");
+    }
+
+    const indexValue = this.addressToValue(index);    
+    const size = this.heap.getInt32(array * WORD_SIZE + 4);
+    if (indexValue >= size) {
+      throw new Error("Index out of bounds");
+    }
+
+    // calculate the extension node to access
+    const nodesAway = Math.floor(indexValue / 8);
+    const offset = indexValue % 8;
+
+    // traverse <nodesAway> nodes down the array
+    let working = array;
+
+    for (let i = 0; i < nodesAway; i++) {
+      if (!(this.isExtension(working) || this.isArray(working))) {
+        throw new Error("Not an array");
+      }
+      working = this.getWord(working + 9);
+    }
+
+    // set the address to the value
+    this.setWord(working + offset + 1, value);
+  }
+
   // slices are represented as a tagged pointer.
   // they have 1 child, which points to the array.
   // or perhaps we need more children corresponding to the size of

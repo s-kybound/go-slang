@@ -24,7 +24,9 @@ import {
   ROFInstr,
   BLOCKInstr,
   DONEInstr,
-  CLEAR_WAITInstr
+  CLEAR_WAITInstr,
+  ACCESS_ADDRESSInstr,
+  ASSIGN_ADDRESSInstr,
 } from "./instructions"
 
 import { compileTimeEnvPosition } from "./compiler";
@@ -115,4 +117,12 @@ export function makeCLEAR_WAITInstr(): CLEAR_WAITInstr {
 
 export function makeBLOCKInstr(): BLOCKInstr {
   return { type: InstrType.BLOCK }
+}
+
+export function makeACCESS_ADDRESSInstr(): ACCESS_ADDRESSInstr {
+  return { type: InstrType.ACCESS_ADDRESS }
+}
+
+export function makeASSIGN_ADDRESSInstr(): ASSIGN_ADDRESSInstr {
+  return { type: InstrType.ASSIGN_ADDRESS }
 }

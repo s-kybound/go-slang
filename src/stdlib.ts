@@ -16,6 +16,13 @@ export const stdlib: Stdlib = {
     return channel;
   }],
 
+  make_array: [1, (g: Goroutine) => {
+    const size = g.operandStack.pop();
+    const sizeValue = g.heap.addressToValue(size);
+    const array = g.heap.allocateArray(sizeValue);
+    return array;
+  }],
+
   is_number: [1, (g: Goroutine) => {
     const addr = g.operandStack.pop();
     return g.heap.valueToAddress(g.heap.isNumber(addr));

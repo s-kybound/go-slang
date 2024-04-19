@@ -15,7 +15,6 @@ import {
   makeASSIGNInstr,
   makeLDFInstr,
   makeCALLInstr,
-  makeTCALLInstr,
   makeRESETInstr,
   makeLAUNCH_THREADInstr,
   makeSENDInstr,
@@ -24,7 +23,9 @@ import {
   makeROFInstr,
   makeBLOCKInstr,
   makeDONEInstr,
-  makeCLEAR_WAITInstr
+  makeCLEAR_WAITInstr,
+  makeACCESS_ADDRESSInstr,
+  makeASSIGN_ADDRESSInstr
 } from "./instr_maker";
 
 import * as inst from "./instructions";
@@ -268,6 +269,19 @@ export class GoCompiler {
         });
       // then compile every name, in reverse
       comp.ids.reverse().forEach((id) => {
+        if (id.type === "indexAccess") {
+          // id is an index access
+          id = id as ast_type.IndexAccess;
+          // compile the accessed
+          this.compileFuncs[id.accessed.type](id.accessed, ce);
+          // now compile the index
+          this.compileFuncs[id.index.type](id.index, ce);
+          // now we can assign the value
+          this.instrs[this.wc++] = makeASSIGN_ADDRESSInstr();
+          return;
+        }
+        // id is an identifier
+        id = id as ast_type.Identifier;
         this.instrs[this.wc++] = makeASSIGNInstr(id.name, compileTimeEnvPosition(ce, id.name));
         });
       },
@@ -399,6 +413,14 @@ export class GoCompiler {
       this.compileFuncs[comp.chan.type](comp.chan, ce);
       // add the receive instruction - depends on whether we are in a select statement
       this.instrs[this.wc++] = comp.inSelect ? makeROFInstr(0) : makeRECEIVEInstr();
+    },
+    indexAccess: (comp: ast_type.IndexAccess, ce: compileTimeEnv) => {
+      // compile the accessed
+      this.compileFuncs[comp.accessed.type](comp.accessed, ce);
+      // compile the index
+      this.compileFuncs[comp.index.type](comp.index, ce);
+      // add the access address instruction
+      this.instrs[this.wc++] = makeACCESS_ADDRESSInstr();
     },
     selectStatement: (comp: ast_type.SelectStatement, ce: compileTimeEnv) => {
       // get the local variables in the if statement
