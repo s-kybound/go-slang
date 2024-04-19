@@ -164,7 +164,7 @@ func main() {
 
 export const ifStatement = `
 func main() {
-  if x := 1; true {
+  if x := 1.4; true {
     display(x);
     display("true");
   } else {

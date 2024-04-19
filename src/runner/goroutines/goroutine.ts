@@ -380,15 +380,15 @@ export class Goroutine {
     }
     const instr = this.instructions[this.programCounter];
     try {
-      console.log("before: ", this.operandStack);
-      console.log(this.programCounter, instr);
+      //console.log("before: ", this.operandStack);
+      //console.log(this.programCounter, instr);
       this.executeInstruction(instr);
       // we should assert that the working list is empty
       // after every instruction
       if (this.working.length !== 0) {
         throw new Error("Working list not empty");
       }
-      console.log("after: ", this.operandStack);
+      //console.log("after: ", this.operandStack);
     } catch (e) {
       // display the current stack trace
       // console.log("Error in goroutine: ", e);

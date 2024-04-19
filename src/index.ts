@@ -14,11 +14,11 @@ compiler.compile();
 
 const instructions = compiler.getInstrs();
 
-let i = 0;
-instructions.forEach((instr) => {
-  console.log(i, instr);
-  i++;
-})
+// let i = 0;
+// instructions.forEach((instr) => {
+//   console.log(i, instr);
+//   i++;
+// })
 
 const QUANTUM = 22;
 
