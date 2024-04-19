@@ -143,3 +143,34 @@ func main() {
   return;
 }
 `;
+
+export const deadlock = `
+func main() {
+  c := make_channel();
+  c <- 1;
+  c <- 2;
+  return;
+}
+`;
+
+export const forLoop = `
+func main() {
+  for i := 0; i < 10; i = i + 1 {
+    display(i);
+  }
+  return;
+}
+`;
+
+export const ifStatement = `
+func main() {
+  if x := 1; true {
+    display(x);
+    display("true");
+  } else {
+    display(x);
+    display("false");
+  }
+  return;
+}
+`;

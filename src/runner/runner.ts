@@ -43,12 +43,14 @@ export class Runner {
     this.goroutines.push(g);
   }
 
+  // spawns a new thread with the given pc and environment.
   launchThread(pc: number, e: number) {
     const newGoroutine = new Goroutine(pc, this, this.instructions, e);
     this.goroutines.push(newGoroutine);
   }
 
-  // move to the next available goroutine.
+  // a round robin scheduler that cycles through the goroutines.
+  // if a goroutine is blocked, it will check if it can be unblocked.
   cycleNext() {
     let string = "context switching from: " + this.currGoroutine + " to ";
     // we will cycle through the goroutine ring once, finding the next runnable goroutine,
