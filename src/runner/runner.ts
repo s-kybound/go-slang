@@ -21,10 +21,10 @@ export class Runner {
    * @param quantum the quantum each goroutine is allowed to run for. (removed once webworkers are added).
    * @param size the size of memory (in megabytes)
    */
-  constructor(instructions: instr.Instr[], quantum: number, size: number) {
+  constructor(instructions: instr.Instr[], quantum: number, size: number, withBytes: boolean = false) {
     this.instructions = instructions;
     this.quantum = quantum;
-    this.heap = Heap.createWithBytes(size, this);
+    this.heap = withBytes ? Heap.createWithBytes(size, this) : Heap.create(size, this);
     this.programEnvironment = this.heap.globalEnv;
     this.mainGoroutine = new Goroutine(0, this, this.instructions, this.programEnvironment);
     this.goroutines = [this.mainGoroutine];

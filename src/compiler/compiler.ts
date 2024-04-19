@@ -60,6 +60,8 @@ function compileTimeEnvPosition(ce: compileTimeEnv, name: string): compileTimeEn
   if (frameIndex === undefined) {
     throw new Error(`Variable ${name} not found in compile-time environment`);
   }
+
+  // console.log(`name ${name} found at frame ${frameIndex} index ${ce[frameIndex].indexOf(name)}`)
   return [frameIndex, ce[frameIndex].indexOf(name)];
 }
 
@@ -353,10 +355,11 @@ export class GoCompiler {
       // scan the function body + formals for variables
       // identifiers aren't detected by scanForVariables so we do something different
       let locals = comp.formals.map((id) => id.name);
-      locals = locals.concat(comp.body.flatMap(scanForVariables));
+      let fnBody = comp.body.flatMap(scanForVariables);
+      // console.log(`locals: ${locals.length}`)
       // create a new scope
-      this.instrs[this.wc++] = makeENTER_SCOPEInstr(locals.length);
-      const functionScope = compileTimeEnvExtend(ce, locals);
+      this.instrs[this.wc++] = makeENTER_SCOPEInstr(fnBody.length);
+      const functionScope = compileTimeEnvExtend(compileTimeEnvExtend(ce, locals), fnBody);
       // compile the function body
       comp.body.forEach((stmt) => {
         this.compileFuncs[stmt.type](stmt, functionScope);

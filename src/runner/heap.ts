@@ -93,6 +93,11 @@ export class Heap {
   // the runner that the heap is associated with
   private runner: Runner;
 
+  // a list of addresses that should be protected from GC
+  // while they are still being constructed by the program.
+  // for example, this is used to protect the global environment while it is being constructed.
+  private working: number[] = [];
+
   // constructor for the heap.
   // remember that the size is given in bytes.
   private constructor(size: number, runner: Runner) {
@@ -113,22 +118,19 @@ export class Heap {
     // while allocating items, mark them to protect them from GC
     // allocate the global environment
     this.False = this.allocate(Tag.FALSE, 0);
-    this.mark(this.False)
+    this.working.push(this.False);
     this.True = this.allocate(Tag.TRUE, 0);
-    this.mark(this.True);
+    this.working.push(this.True);
     this.Null = this.allocate(Tag.NULL, 0);
-    this.mark(this.Null);
+    this.working.push(this.Null);
     this.Undefined = this.allocate(Tag.UNDEFINED, 0);
-    this.mark(this.Undefined);
+    this.working.push(this.Undefined);
     this.Unallocated = this.allocate(Tag.UNALLOCATED, 0);
-    this.mark(this.Unallocated);
+    this.working.push(this.Unallocated);
     this.globalEnv = this.initGlobalEnvironment();
-    // unmark the literals
-    this.unmark(this.False);
-    this.unmark(this.True);
-    this.unmark(this.Null);
-    this.unmark(this.Undefined);
-    this.unmark(this.Unallocated);
+
+    // revert the working set
+    this.working = [];
   }
 
   // create a new heap with a size given in megabytes.
@@ -143,28 +145,41 @@ export class Heap {
   }
 
   private initGlobalEnvironment(): number {
+    // we track the total number of objects we add to the working here
+    let numAddedToWorking = 0;
     // get the total number of objects in the stdlib and constants
     const total = Object.keys(stdlib).length + Object.keys(constants).length;
     // allocate a single frame
     const frame = this.allocateFrame(total);
-    
+    this.working.push(frame);
+    numAddedToWorking++;
+
     // set the bindings in the frame
     let i = 0;
     for (const key in stdlib) {
       this.builtins[i] = stdlib[key as keyof Stdlib];
       const builtin = this.allocateBuiltin(i);
+      this.working.push(builtin);
+      numAddedToWorking++;
       this.setFrameValue(frame, i, builtin);
       i++;
     }
     for (const key in constants) {
-      this.setFrameValue(frame, i, this.valueToAddress(constants[key as keyof Constants]));
+      const val = this.valueToAddress(constants[key as keyof Constants]);
+      this.working.push(val);
+      numAddedToWorking++;
+      this.setFrameValue(frame, i, val);
       i++;
     }
     // allocate the global environment
     const addr = this.allocateEnvironment(1);
-    this.unmark(frame);
+    this.working.push(addr);
+    numAddedToWorking++;
     // set the first frame in the environment
     this.setWord(addr + 1, frame);
+
+    // revert the working set by the amount added
+    this.working = this.working.slice(0, this.working.length - numAddedToWorking);
     return addr;
   }
 
@@ -324,10 +339,13 @@ export class Heap {
     this.mark(this.Undefined);
     this.mark(this.Unallocated);
 
+    // mark everything in the working set
+    this.working.forEach(address => this.markRecursive(address));
+
     // recursively mark the global environment
     this.markRecursive(this.globalEnv);
 
-    // now signal the runner to signal each goroutine to mark itself
+    // now signal the runner to signal each goroutine to mark its own stuff
     this.runner.markGoroutines();
 
     // finally, sweep the heap
@@ -487,60 +505,72 @@ export class Heap {
     return this.allocate(Tag.STRUCT, 0);
   }
 
+  // an abstraction for allocating a new item with any number of children.
+  // this is useful for arrays, slices, closures, and environments.
+  allocateItemWithExtension(tag: Tag, children: number): number {
+     // check the size of the item - how many extensions do we need?
+    let addr: number;
+
+    // track the number of objects added to the working set
+    let numberAdded = 0;
+
+    // from the number of children given, we can calculate the number of extensions required
+    const numExtensions = children === 0 ? 0 : Math.ceil(children / 8) - 1;
+    
+    // the remainder of the children
+    const offset = children % 8;
+
+    // allocate the first node
+    addr = this.allocate(tag, numExtensions > 0 ? 9 : offset);
+    // protect the address from GC
+    this.working.push(addr);
+    numberAdded++;
+    
+    // set all children to UNALLOCATED
+    // we don't need to care about the offset since
+    // our logic will prevent us from accessing the children
+    // that are out of bounds anyway
+    for (let i = 1; i <= 9; i++) {
+      this.setWord(addr + i, this.Unallocated);
+    }
+
+    let working = addr;
+    if (numExtensions > 0) {
+      // allocate the extensions
+      for (let i = 0; i < numExtensions; i++) {
+        const ext = this.allocateExtension(i === numExtensions - 1 ? offset : 9);
+        // protect the extension from GC
+        this.working.push(ext);
+        numberAdded++;
+        // set the extension node to the working node
+        this.setWord(working + 9, ext);
+        // set every child of the extension to UNALLOCATED
+        for (let i = 1; i <= 9; i++) {
+          this.setWord(ext + i, this.Unallocated);
+        }
+        // traverse down the extension node
+        working = ext;
+      }
+    }
+    // set the last extension node to UNALLOCATED
+    this.setWord(working + 9, this.Unallocated);
+
+    // revert the working set
+    this.working = this.working.slice(0, this.working.length - numberAdded);
+
+    return addr;
+  }
+
   // arrays are represented as a tagged pointer.
   // they have children which correspond to the given size of the
   // array.
   // the metadata consists of the size of the array.
   allocateArray(size: number): number {
-    // check the size of the array - how many extensions do we need?
-    let addr: number;
-    if (size > 8) {
-      // allocate the extensions
-      addr = this.allocate(Tag.ARRAY, 9);
-      // mark the address first, just in case we need to GC later
-      this.mark(addr);
-      // set the first 8 children to UNALLOCATED
-      for (let i = 1; i <= 8; i++) {
-        this.setWord(addr + i, this.Unallocated);
-      }
-      // allocate the extensions
-      let working = addr;
-      let sizeLeft = size - 8;
-      while (sizeLeft > 0) {
-        // allocate a single extension
-        const ext = this.allocateExtension(sizeLeft > 8 ? 9 : sizeLeft);
-        // mark the extension
-        this.mark(ext);
-        // set the extension node to the working node
-        this.setWord(working + 9, ext);
-        // set every child of the extension to UNALLOCATED
-        for (let i = 1; i <= 8; i++) {
-          this.setWord(ext + i, this.Unallocated);
-        }
-        // traverse down the extension node
-        working = ext;
-        sizeLeft -= 8;
-      }
-      // set the last extension node to UNALLOCATED
-      this.setWord(working + 9, this.Unallocated);
-      // unmark the address
-      this.unmark(addr);
-      working = addr;
-      // traverse down to the last extension node, unmarking as we go
-      do {
-        this.unmark(working);
-        working = this.getWord(working + 9);
-      } while (this.getTag(working) === Tag.EXTENSION) 
-    } else {
-      addr = this.allocate(Tag.ARRAY, size);
-      // set the children to UNALLOCATED
-      for (let i = 1; i <= size; i++) {
-        this.setWord(addr + i, this.Unallocated);
-      }
-    }
+    let addr = this.allocateItemWithExtension(Tag.ARRAY, size);
     
     // set the last 4 bytes to the size of the array
-    this.heap.setInt32(addr * WORD_SIZE + 4, size); 
+    this.heap.setInt32(addr * WORD_SIZE + 4, size);
+
     return addr;
   }
 
@@ -658,54 +688,18 @@ export class Heap {
 
   // environments are represented as a tagged pointer.
   // they have children corresponding to the frames in the environment.
+  // the metadata consists of the number of frames in the environment.
   allocateEnvironment(frames: number): number {
-    // check the size of the environment - how many extensions do we need?
-    let addr: number;
-    if (frames > 8) {
-      // allocate the extensions
-      addr = this.allocate(Tag.ENVIRONMENT, 9);
-      // mark the address first, just in case we need to GC later
-      this.mark(addr);
-      // set the first 8 children to UNALLOCATED
-      for (let i = 1; i <= 8; i++) {
-        this.setWord(addr + i, this.Unallocated);
-      }
-      // allocate the extensions
-      let working = addr;
-      let sizeLeft = frames - 8;
-      while (sizeLeft > 0) {
-        // allocate a single extension
-        const ext = this.allocateExtension(sizeLeft > 8 ? 9 : sizeLeft);
-        // mark the extension
-        this.mark(ext);
-        // set the extension node to the working node
-        this.setWord(working + 9, ext);
-        // set every child of the extension to UNALLOCATED
-        for (let i = 1; i <= 8; i++) {
-          this.setWord(ext + i, this.Unallocated);
-        }
-        // traverse down the extension node
-        working = ext;
-        sizeLeft -= 8;
-      }
-      // set the last extension node to UNALLOCATED
-      this.setWord(working + 9, this.Unallocated);
-      // unmark the address
-      this.unmark(addr);
-      working = addr;
-      // traverse down to the last extension node, unmarking as we go
-      do {
-        this.unmark(working);
-        working = this.getWord(working + 9);
-      } while (this.getTag(working) === Tag.EXTENSION) 
-    } else {
-      addr = this.allocate(Tag.ENVIRONMENT, frames);
-      // set the children to UNALLOCATED
-      for (let i = 1; i <= frames; i++) {
-        this.setWord(addr + i, this.Unallocated);
-      }
-    }
+    let addr = this.allocateItemWithExtension(Tag.ENVIRONMENT, frames);
+    this.heap.setInt32(addr * WORD_SIZE + 4, frames);
     return addr;
+  }
+
+  getNumEnvironmentFrames(env: number): number {
+    if (!this.isEnvironment(env)) {
+      throw new Error("Not an environment");
+    }
+    return this.heap.getInt32(env * WORD_SIZE + 4);
   }
 
   // allocate a new environment, given a parent environment and a frame.
@@ -716,68 +710,59 @@ export class Heap {
     if (!this.isFrame(frame)) {
       throw new Error("Not a frame");
     }
-    // first, allocate a new environment
-    const addr = this.allocateEnvironment(0);
+    // track how many objects we add to the working set
+    let numAdded = 0;
 
-    if (this.getNumChildren(env) >= 8) { 
-      // we need to copy every frame from the old environment
-      // to the new environment.
-      // start with the environment node itself.
+    // protect both the environment and frame
+    this.working.push(env);
+    numAdded++;
+    this.working.push(frame);
+    numAdded++;
+
+    // get the number of frames from the environment
+    const frames = this.getNumEnvironmentFrames(env);
+
+    // allocate a new environment with frames + 1
+    const addr = this.allocateEnvironment(frames + 1);
+
+    // protect the new environment
+    this.working.push(addr);
+    numAdded++;
+
+    // now we need to iterate through the old environment and copy every frame
+    // to the new environment.
+    let newWorking = addr;
+    let oldWorking = env;
+    // while the old working node has an extension, match the extension
+    while (this.getNumChildren(oldWorking) > 8) {
       for (let i = 1; i <= 8; i++) {
         this.setWord(addr + i, this.getWord(env + i));
       }
-      let newWorking = addr;
-      let oldWorking = env;
-      while (this.getNumChildren(oldWorking) > 8) {
-        // allocate a new extension node
-        const ext = this.allocateExtension(9);
-        // set the extension node to the new working node
-        this.setWord(newWorking + 9, ext);
-        // set every child of the extension to the old working node
-        for (let i = 1; i <= 8; i++) {
-          this.setWord(ext + i, this.getWord(oldWorking + i));
-        }
-        // traverse down the extension node
-        newWorking = ext;
-        oldWorking = this.getWord(oldWorking + 9);
-      }
-      // 2 cases are possible here:
-      // 1. the old working node has < 8 children, so we can just copy a new extension node
-      // 2. the old environment has exactly 8 children, so we need to allocate one more extension node.
-      if (this.getNumChildren(oldWorking) < 8) {
-        const ext = this.allocateExtension(this.getNumChildren(oldWorking + 1));
-        this.setWord(newWorking + 9, ext);
-        let i = 1;
-        for (; i <= this.getNumChildren(oldWorking); i++) {
-          this.setWord(ext + i, this.getWord(oldWorking + i));
-        }
-        this.setWord(ext + i, frame);
-        return addr;
-      }
-      // case 2
-
-      // we need to allocate yet another node
-      let ext = this.allocateExtension(9);
-      this.setWord(newWorking + 9, ext);
-      for (let i = 1; i <= 8; i++) {
-        this.setWord(ext + i, this.getWord(oldWorking + i));
-      }
-      // allocate another extension node
-      // the one child of the extension node is the new frame
-      ext = this.allocateExtension(1);
-      this.setWord(newWorking + 9, ext);
-      this.setWord(ext + 1, frame);
-      return addr;
+      // traverse down both the old and new working nodes
+      newWorking = this.getWord(newWorking + 9);
+      oldWorking = this.getWord(oldWorking + 9);
     }
 
-    // there's no need to reason about extensions.
-    // just set the new frame to the next child of the environment.
-    const children = this.getNumChildren(env);
-    for (let i = 1; i <= children; i++) {
-      this.setWord(addr + i, this.getWord(env + i));
+    // 2 cases are possible here:
+    // 1. the old working node has < 8 children, so we can just copy the last frame on top of it.
+    //    keep in mind that this still works if the old working node is currently pointing to <unallocated>
+    //    so all is good.
+    // 2. the old environment has exactly 8 children, so we need to traverse to our newly created
+    // extension node and copy the last frame there.
+    const oldFrames = this.getNumChildren(oldWorking);
+    if (oldFrames < 8) {
+      for (let i = 1; i <= oldFrames; i++) {
+        this.setWord(addr + i, this.getWord(env + i));
+      }
+      // set the new frame
+      this.setWord(addr + oldFrames + 1, frame);
+    } else {
+      // case 2 - traverse to the extension node and copy the last frame there
+      newWorking = this.getWord(newWorking + 9);
+      this.setWord(newWorking + oldFrames + 1, frame);
     }
-    this.setWord(addr + children + 1, frame);
-    this.setNumChildren(addr, children + 1);
+    // revert the working set
+    this.working = this.working.slice(0, this.working.length - numAdded);
     return addr;
   }
 
@@ -789,14 +774,23 @@ export class Heap {
       throw new Error("Not an environment");
     }
     let [frameIndex, bindingIndex] = index;
-    // get the correct frame
+    
+    // we must calculate the correct position from the index
+    const nodesAway = Math.floor(frameIndex / 8);
+    const offset = frameIndex % 8;
+    
+    // traverse <nodesAway> nodes away from the frame
     let working = env;
-    while (frameIndex > 7) {
+    
+    for (let i = 0; i < nodesAway; i++) {
+      if (!(this.isExtension(working) || this.isEnvironment(working))) {
+        throw new Error("Not an environment");
+      }
       working = this.getWord(working + 9);
-      frameIndex -= 8;
     }
+
     // working now points to the correct node
-    const frame = this.getWord(working + frameIndex + 1);
+    const frame = this.getWord(working + offset + 1);
     return this.getFrameValue(frame, bindingIndex);
   }
 
@@ -808,67 +802,31 @@ export class Heap {
       throw new Error("Not an environment");
     }
     let [frameIndex, bindingIndex] = index;
-    // get the correct frame
+    
+    // we must calculate the correct position from the index
+    const nodesAway = Math.floor(frameIndex / 8);
+    const offset = frameIndex % 8;
+    
+    // traverse <nodesAway> nodes away from the frame
     let working = env;
-    while (frameIndex > 7) {
+    
+    for (let i = 0; i < nodesAway; i++) {
+      if (!(this.isExtension(working) || this.isEnvironment(working))) {
+        throw new Error("Not an environment");
+      }
       working = this.getWord(working + 9);
-      frameIndex -= 8;
     }
+
     // working now points to the correct node
-    const frame = this.getWord(working + frameIndex + 1);
+    const frame = this.getWord(working + offset + 1);
     this.setFrameValue(frame, bindingIndex, value);
   }
 
   // frames are represented as a tagged pointer.
   // they have children corresponding to the bindings in the frame.
   allocateFrame(bindings: number): number {
-    // check the size of the frame - how many extensions do we need?
-    let addr: number;
-    if (bindings > 8) {
-      // allocate the extensions
-      addr = this.allocate(Tag.FRAME, 9);
-      // mark the address first, just in case we need to GC later
-      this.mark(addr);
-      // set the first 8 children to UNALLOCATED
-      for (let i = 1; i <= 8; i++) {
-        this.setWord(addr + i, this.Unallocated);
-      }
-      // allocate the extensions
-      let working = addr;
-      let sizeLeft = bindings - 8;
-      while (sizeLeft > 0) {
-        // allocate a single extension
-        const ext = this.allocateExtension(sizeLeft > 8 ? 9 : sizeLeft);
-        // mark the extension
-        this.mark(ext);
-         
-        // set the extension node to the working node
-        this.setWord(working + 9, ext);
-        // set every child of the extension to UNALLOCATED
-        for (let i = 1; i <= 8; i++) {
-          this.setWord(ext + i, this.Unallocated);
-        }
-        // traverse down the extension node
-        working = ext;
-        sizeLeft -= 8;
-      }
-      // set the last extension node to UNALLOCATED
-      this.setWord(working + 9, this.Unallocated);
-      // unmark the address
-      this.unmark(addr);
-      working = addr;
-      // traverse down to the last extension node, unmarking as we go
-      do {
-        this.unmark(working);
-        working = this.getWord(working + 9);
-      } while (this.getTag(working) === Tag.EXTENSION);
-    } else {
-      addr = this.allocate(Tag.FRAME, bindings);
-      // set the children to UNALLOCATED
-      for (let i = 1; i <= bindings; i++) {
-        this.setWord(addr + i, this.Unallocated);
-      }
-    }
+    const addr = this.allocateItemWithExtension(Tag.FRAME, bindings);
+
     return addr;
   }
 
@@ -878,15 +836,23 @@ export class Heap {
     if (!this.isFrame(frame)) {
       throw new Error("Not a frame");
     }
-    // if index is more than 7, we need to traverse down the extension nodes
-    let working = frame;
-    while (index > 7) {
-      working = this.getWord(working + 9);
-      index -= 8;
-    }
-    // working now points to the correct node
 
-    return this.getWord(working + index + 1);
+    // we must calculate the correct position from the index
+    const nodesAway = Math.floor(index / 8);
+    const offset = index % 8;
+
+    // traverse <nodesAway> nodes away from the frame
+    let working = frame;
+    
+    for (let i = 0; i < nodesAway; i++) {
+      if (!(this.isExtension(working) || this.isFrame(working))) {
+        throw new Error("Not a frame");
+      }
+      working = this.getWord(working + 9);
+    }
+
+    // now we can get the offset from the working node
+    return this.getWord(working + offset + 1);
   }
 
   // set the value at a given index in the frame.
@@ -895,15 +861,21 @@ export class Heap {
     if (!this.isFrame(frame)) {
       throw new Error("Not a frame");
     }
-    // if index is more than 7, we need to traverse down the extension nodes
+    // we must calculate the correct position from the index
+    const nodesAway = Math.floor(index / 8);
+    const offset = index % 8;
+    // traverse <nodesAway> nodes away from the frame
     let working = frame;
-    while (index > 7) {
+    
+    for (let i = 0; i < nodesAway; i++) {
+      if (!(this.isExtension(working) || this.isFrame(working))) {
+        throw new Error("Not a frame");
+      }
       working = this.getWord(working + 9);
-      index -= 8;
     }
-    // working now points to the correct node
 
-    this.setWord(working + index + 1, value);
+    // now we can get the offset from the working node
+    this.setWord(working + offset + 1, value);
   }
 
   // block frames are represented as a tagged pointer, with
@@ -1014,7 +986,7 @@ export class Heap {
     if (this.isUndefined(address)) {
       return undefined;
     }
-    console.log(this.typeOfTag(this.getTag(address)));
+    //console.log(this.typeOfTag(this.getTag(address)));
     throw new Error("Unsupported address");
   }
 

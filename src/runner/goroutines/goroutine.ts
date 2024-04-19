@@ -15,6 +15,9 @@ export class Goroutine {
   private done: boolean = false;
   private blocked: boolean = false;
 
+  // A transitionary field for addresses that are required but are in "transit"
+  private working: number[] = [];
+
   constructor(programCounter: number, runner: Runner, inst:instr.Instr[], environment: number) {
     this.runner = runner;
     this.instructions = inst;
@@ -66,15 +69,21 @@ export class Goroutine {
         break;
       case instr.InstrType.UNOP:
         const operand = this.operandStack.pop();
+        this.working.push(operand);
         const unopRes = this.performUnOpcode((i as instr.UNOPInstr).op, operand);
         this.operandStack.push(unopRes);
+        this.working.pop();
         this.programCounter++;
         break;
       case instr.InstrType.BINOP:
         const right = this.operandStack.pop();
         const left = this.operandStack.pop();
+        this.working.push(left);
+        this.working.push(right);
         const binopRes = this.performBinOpcode((i as instr.BINOPInstr).op, left, right);
         this.operandStack.push(binopRes);
+        this.working.pop();
+        this.working.pop();
         this.programCounter++;
         break;
       case instr.InstrType.POP:
@@ -94,9 +103,15 @@ export class Goroutine {
       case instr.InstrType.ENTER_SCOPE:
         let str = "enter scope from " + this.environment;
         // make a new scope
-        this.runtimeStack.push(this.heap.allocateBlockFrame(this.environment));
+        const blockFrame = this.heap.allocateBlockFrame(this.environment);
+        this.working.push(blockFrame);
+        this.runtimeStack.push(blockFrame);
+        // console.log("allocating frame with", (i as instr.ENTER_SCOPEInstr).syms, "symbols");
         const newFrame = this.heap.allocateFrame((i as instr.ENTER_SCOPEInstr).syms);
+        this.working.push(newFrame);
         this.environment = this.heap.extendEnvironment(this.environment, newFrame);
+        this.working.pop();
+        this.working.pop();
         str += " to " + this.environment;
         // console.log(str);
         this.programCounter++;
@@ -117,6 +132,7 @@ export class Goroutine {
         break;
       case instr.InstrType.ASSIGN:
         const assignValue = this.operandStack.pop();
+        // console.log("assigning ", assignValue, " to ", (i as instr.ASSIGNInstr).name, "with position ", (i as instr.ASSIGNInstr).pos);
         this.heap.setEnvironmentValue(this.environment, (i as instr.ASSIGNInstr).pos, assignValue);
         this.programCounter++;
         break;
@@ -140,6 +156,9 @@ export class Goroutine {
         
         const fn = this.operandStack.pop();
 
+        // add all the items to the working list
+        this.working = this.working.concat(args);
+        
         if (this.heap.isBuiltin(fn)) {
           // console.log("builtin function")
           // put the arguments back on the stack
@@ -153,6 +172,10 @@ export class Goroutine {
           // push the result onto the stack
           this.operandStack.push(res);
           this.programCounter++;
+
+          // remove the arguments from the working list
+          this.working = [];
+
           break;
         }
 
@@ -162,16 +185,22 @@ export class Goroutine {
         
         if (i.type === instr.InstrType.CALL) {
           // push onto runtime stack
-          this.runtimeStack.push(this.heap.allocateCallFrame(this.environment, this.programCounter + 1));
+          const callFrame = this.heap.allocateCallFrame(this.environment, this.programCounter + 1);
+          this.runtimeStack.push(callFrame);
         }
 
         const parameterFrame = this.heap.allocateFrame(arity);
+        this.working.push(parameterFrame);
         for (let i = 0; i < arity; i++) {
           this.heap.setFrameValue(parameterFrame, i, args[i]);
         }
 
         this.environment = this.heap.extendEnvironment(this.heap.getClosureEnv(fn), parameterFrame);
         this.programCounter = this.heap.getClosurePC(fn);
+
+        // now remove everything from the working list
+        this.working = [];
+
         break;
       case instr.InstrType.RESET:
         // pop from runtime stack until we find a call frame
@@ -191,11 +220,13 @@ export class Goroutine {
         {
         const val = this.operandStack.pop();
         const chan = this.operandStack.pop();
-        /*
-        if (!isChannel(channel)) {
+        
+        this.working = this.working.concat([val, chan]);
+
+        if (!this.heap.isChan(chan)) {
           throw new Error("Expected a channel");
         }
-        */
+        
         if (this.heap.channelIsFull(chan)) {
           // put the value and channel back on the stack
           this.operandStack.push(chan);
@@ -204,20 +235,25 @@ export class Goroutine {
           this.blocked = true;
 
           this.waitingOn.push(this.heap.allocateWaitSend(chan));
+          this.working.pop();
+          this.working.pop();
           this.runner.cycleNext();
           return;
         }
         this.heap.channelPushItem(chan, val);
         this.programCounter++;
+        this.working.pop();
+        this.working.pop();
         }
         break;
       case instr.InstrType.RECEIVE: {
         const chan = this.operandStack.pop();
-        /*
-        if (!isChannel(channel)) {
+        this.working.push(chan);
+        
+        if (!this.heap.isChan(chan)) {
           throw new Error("Expected a channel");
         }
-        */
+        
         if (this.heap.channelIsEmpty(chan)) {
           // put the channel back on the stack
           this.operandStack.push(chan);
@@ -225,9 +261,11 @@ export class Goroutine {
           this.blocked = true;
           this.waitingOn.push(this.heap.allocateWaitReceive(chan));
           this.runner.cycleNext();
+          this.working.pop();
           break;
         }
         const val = this.heap.channelPopItem(chan);
+        this.working.pop();
         this.operandStack.push(val);
         this.programCounter++;
       }
@@ -235,6 +273,7 @@ export class Goroutine {
       case instr.InstrType.SOF: {
         const val = this.operandStack.pop();
         const chan = this.operandStack.pop();
+        this.working.concat([val, chan]);
         if (this.heap.channelIsFull(chan)) {
           // console.log("channel is full, failing send");
           // the send fails
@@ -247,10 +286,13 @@ export class Goroutine {
           this.heap.channelPushItem(chan, val);
           this.programCounter++;
         }
+        this.working.pop();
+        this.working.pop();
       }
         break;
       case instr.InstrType.ROF: {
         const chan = this.operandStack.pop();
+        this.working.push(chan);
         if (this.heap.channelIsEmpty(chan)) {
           // console.log("channel is empty, failing receive");
           // the receive fails
@@ -264,6 +306,7 @@ export class Goroutine {
           this.operandStack.push(val);
           this.programCounter++;
         }
+        this.working.pop();
       }
         break;
       case instr.InstrType.BLOCK:
@@ -336,10 +379,13 @@ export class Goroutine {
     }
     const instr = this.instructions[this.programCounter];
     try {
-      console.log("before: ", this.operandStack);
-      console.log(this.programCounter, instr);
+      //console.log("before: ", this.working);
+      //console.log(this.programCounter, instr);
       this.executeInstruction(instr);
-      console.log("after: ", this.operandStack);
+      // we should assert that the working list is empty
+      // after every instruction
+      this.working = [];
+      //console.log("after: ", this.working);
     } catch (e) {
       // display the current stack trace
       // console.log("Error in goroutine: ", e);
@@ -359,6 +405,9 @@ export class Goroutine {
 
   mark() {
     this.heap.markRecursive(this.environment);
+    this.working.forEach((addr) => {
+      this.heap.markRecursive(addr);
+    });
     this.operandStack.forEach((addr) => {
       this.heap.markRecursive(addr);
     });
