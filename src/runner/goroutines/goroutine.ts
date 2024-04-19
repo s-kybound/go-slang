@@ -336,10 +336,10 @@ export class Goroutine {
     }
     const instr = this.instructions[this.programCounter];
     try {
-      // console.log("before: ", this.operandStack);
-      // console.log(this.programCounter, instr);
+      console.log("before: ", this.operandStack);
+      console.log(this.programCounter, instr);
       this.executeInstruction(instr);
-      // console.log("after: ", this.operandStack);
+      console.log("after: ", this.operandStack);
     } catch (e) {
       // display the current stack trace
       // console.log("Error in goroutine: ", e);
@@ -355,6 +355,19 @@ export class Goroutine {
   unblock() {
     this.waitingOn = [];
     this.blocked = false;
+  }
+
+  mark() {
+    this.heap.markRecursive(this.environment);
+    this.operandStack.forEach((addr) => {
+      this.heap.markRecursive(addr);
+    });
+    this.runtimeStack.forEach((addr) => {
+      this.heap.markRecursive(addr);
+    });
+    this.waitingOn.forEach((addr) => {
+      this.heap.markRecursive(addr);
+    });
   }
 
   getFinalValue() {

@@ -24,7 +24,7 @@ export class Runner {
   constructor(instructions: instr.Instr[], quantum: number, size: number) {
     this.instructions = instructions;
     this.quantum = quantum;
-    this.heap = Heap.create(size);
+    this.heap = Heap.createWithBytes(size, this);
     this.programEnvironment = this.heap.globalEnv;
     this.mainGoroutine = new Goroutine(0, this, this.instructions, this.programEnvironment);
     this.goroutines = [this.mainGoroutine];
@@ -58,7 +58,7 @@ export class Runner {
     let foundGoroutine = false;
     for (let i = 0; i < currLength; i++) {
       // get the next goroutine
-      const goroutineToCheck = (this.currGoroutine + i) % this.goroutines.length;
+      const goroutineToCheck = (this.currGoroutine + i + 1) % this.goroutines.length;
 
       // if the goroutine is done, we will clean it up.
       if (this.goroutines[goroutineToCheck].isDone() && goroutineToCheck !== 0) {
@@ -105,6 +105,13 @@ export class Runner {
     // console.log(string);
     // reset the time to 0
     this.time = 0;
+  }
+
+  // signal each goroutine to mark all required elements
+  markGoroutines() {
+    for (let i = 0; i < this.goroutines.length; i++) {
+      this.goroutines[i].mark();
+    }
   }
 
   isDone() {

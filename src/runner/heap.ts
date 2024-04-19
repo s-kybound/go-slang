@@ -1,4 +1,5 @@
 import { stdlib, constants, Stdlib, Constants } from "../stdlib";
+import { Runner } from "./runner";
 
 // a representation of the heap, which stores all data in the program.
 // for go-slang, we use a fixed-size big-endian heap 
@@ -89,9 +90,13 @@ export class Heap {
   // set of builtins, represented with [arity, function]
   builtins: [number, Function][] = [];
 
+  // the runner that the heap is associated with
+  private runner: Runner;
+
   // constructor for the heap.
   // remember that the size is given in bytes.
-  private constructor(size: number) {
+  private constructor(size: number, runner: Runner) {
+    this.runner = runner;
     this.freePointer = 0;
     this.heap = new DataView(new ArrayBuffer(size));
 
@@ -105,24 +110,36 @@ export class Heap {
     // finally, set the last free pointer to -1
     this.setFreePointerAtAddress(i, -1);
 
+    // while allocating items, mark them to protect them from GC
     // allocate the global environment
     this.False = this.allocate(Tag.FALSE, 0);
+    this.mark(this.False)
     this.True = this.allocate(Tag.TRUE, 0);
+    this.mark(this.True);
     this.Null = this.allocate(Tag.NULL, 0);
+    this.mark(this.Null);
     this.Undefined = this.allocate(Tag.UNDEFINED, 0);
+    this.mark(this.Undefined);
     this.Unallocated = this.allocate(Tag.UNALLOCATED, 0);
+    this.mark(this.Unallocated);
     this.globalEnv = this.initGlobalEnvironment();
+    // unmark the literals
+    this.unmark(this.False);
+    this.unmark(this.True);
+    this.unmark(this.Null);
+    this.unmark(this.Undefined);
+    this.unmark(this.Unallocated);
   }
 
   // create a new heap with a size given in megabytes.
-  static create(size: number): Heap {
-    return new Heap(size * MEGABYTE);
+  static create(size: number, runner: Runner): Heap {
+    return new Heap(size * MEGABYTE, runner);
   }
 
   // create a new heap with a size given in bytes.
   // we can use this to test GC with smaller heaps.
-  static createWithBytes(size: number): Heap {
-    return new Heap(size);
+  static createWithBytes(size: number, runner: Runner): Heap {
+    return new Heap(size, runner);
   }
 
   private initGlobalEnvironment(): number {
@@ -130,6 +147,7 @@ export class Heap {
     const total = Object.keys(stdlib).length + Object.keys(constants).length;
     // allocate a single frame
     const frame = this.allocateFrame(total);
+    
     // set the bindings in the frame
     let i = 0;
     for (const key in stdlib) {
@@ -144,6 +162,7 @@ export class Heap {
     }
     // allocate the global environment
     const addr = this.allocateEnvironment(1);
+    this.unmark(frame);
     // set the first frame in the environment
     this.setWord(addr + 1, frame);
     return addr;
@@ -234,6 +253,29 @@ export class Heap {
     this.setByteAtOffset(address, 1, 1);
   }
 
+  markRecursive(address: number) {
+    // if the node is already marked, we return
+    if (this.isMarked(address)) {
+      return;
+    }
+    if (this.isFree(address)) {
+      return;
+    }
+
+    // mark the node itself
+    this.mark(address);
+
+    // get the number of children in the node
+    const children = this.getNumChildren(address);
+
+    // mark the children of the node
+    for (let i = 1; i <= children; i++) {
+      this.markRecursive(this.getWord(address + i));
+    }
+
+    return;
+  }
+
   isMarked(address: number): boolean {
     return this.getByteAtOffset(address, 1) === 1;
   }
@@ -256,15 +298,40 @@ export class Heap {
     while (current * WORD_SIZE < this.heap.byteLength) {
       // only free the node if it is NOT free, and NOT marked
       if (!this.isMarked(current) && !this.isFree(current)) {
+        // if the string pool contains the address, we remove it
+        if (this.isString(current)) {
+          const hash = this.getWord(current + 1);
+          delete this.stringPool[hash];
+        }
         // if the first node is unmarked, we free it.
         this.free(current);
+        console.log("Freeing", current);
       }
+      // unmark this node
+      this.unmark(current);
+      // move to the next node
+      current += NODE_SIZE;
     }
   }
 
   garbageCollect() {
+    console.log("Garbage collecting");
     // mark and sweep algorithm
-    throw new Error("Not implemented");
+    // mark all of the literals
+    this.mark(this.False);
+    this.mark(this.True);
+    this.mark(this.Null);
+    this.mark(this.Undefined);
+    this.mark(this.Unallocated);
+
+    // recursively mark the global environment
+    this.markRecursive(this.globalEnv);
+
+    // now signal the runner to signal each goroutine to mark itself
+    this.runner.markGoroutines();
+
+    // finally, sweep the heap
+    this.sweep();
   }
 
   // data type predicates
@@ -947,6 +1014,7 @@ export class Heap {
     if (this.isUndefined(address)) {
       return undefined;
     }
+    console.log(this.typeOfTag(this.getTag(address)));
     throw new Error("Unsupported address");
   }
 
