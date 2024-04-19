@@ -174,3 +174,12 @@ func main() {
   return;
 }
 `;
+
+export const createStackOverflow = `
+func main() {
+  x := "hello world!";
+  display(x);
+  main();
+  return;
+}
+`;

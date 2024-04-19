@@ -273,32 +273,37 @@ export class GoCompiler {
       },
     ifStatement: (comp: ast_type.IfStatement, ce: compileTimeEnv) => {
       // get the local variables in the if statement
-      let locals: string[] = [];
-      locals = locals.concat(scanForVariables(comp.short));
-      locals = locals.concat(comp.cons.flatMap(scanForVariables));
-      if (comp.alt !== null) {
-        locals = locals.concat(comp.alt.flatMap(scanForVariables));
-      }
+      let ifStatementLocals: string[] = scanForVariables(comp.short);
+      const ifStatementScope = compileTimeEnvExtend(ce, ifStatementLocals);
+      let consLocals = comp.cons.flatMap(scanForVariables);
+      let altLocals = comp.alt ? comp.alt.flatMap(scanForVariables) : [];
+      const consScope = compileTimeEnvExtend(ifStatementScope, consLocals);
+      const altScope = compileTimeEnvExtend(ifStatementScope, altLocals);
       // first create a new scope
-      this.instrs[this.wc++] = makeENTER_SCOPEInstr(locals.length);
+      this.instrs[this.wc++] = makeENTER_SCOPEInstr(ifStatementLocals.length);
       if (comp.short !== null) {
-        this.compileFuncs[comp.short.type](comp.short, compileTimeEnvExtend(ce, locals));
+        this.compileFuncs[comp.short.type](comp.short, ifStatementScope);
       }
-      this.compileFuncs[comp.cond.type](comp.cond, compileTimeEnvExtend(ce, locals));
+      this.compileFuncs[comp.cond.type](comp.cond, ifStatementScope);
       const jof = makeJOFInstr(0);
       this.instrs[this.wc++] = jof;
+      this.instrs[this.wc++] = makeENTER_SCOPEInstr(consLocals.length);
       comp.cons.forEach((stmt) => {
-        this.compileFuncs[stmt.type](stmt, compileTimeEnvExtend(ce, locals));
+        this.compileFuncs[stmt.type](stmt, consScope);
         });
+      this.instrs[this.wc++] = makeEXIT_SCOPEInstr();
       const goto = makeGOTOInstr(0);
       this.instrs[this.wc++] = goto;
       jof.addr = this.wc;
       if (comp.alt !== null) {
+        this.instrs[this.wc++] = makeENTER_SCOPEInstr(altLocals.length);
         comp.alt.forEach((stmt) => {
-          this.compileFuncs[stmt.type](stmt, compileTimeEnvExtend(ce, locals));
+          this.compileFuncs[stmt.type](stmt, altScope);
           });
+        this.instrs[this.wc++] = makeEXIT_SCOPEInstr();
         }
       goto.addr = this.wc;
+      this.instrs[this.wc++] = makeEXIT_SCOPEInstr();
     },
     forStatement: (comp: ast_type.ForStatement, ce: compileTimeEnv) => {
       // get the local variables in the if statement
@@ -306,27 +311,31 @@ export class GoCompiler {
       locals = locals.concat(scanForVariables(comp.init));
       locals = locals.concat(scanForVariables(comp.cond));
       locals = locals.concat(scanForVariables(comp.post));
-      locals = locals.concat(comp.body.flatMap(scanForVariables));
+      const forScope = compileTimeEnvExtend(ce, locals);
+      let bodyLocals = comp.body.flatMap(scanForVariables);
+      const bodyScope = compileTimeEnvExtend(forScope, bodyLocals);
       // first create a new scope
       this.instrs[this.wc++] = makeENTER_SCOPEInstr(locals.length);
       // compile the initializer
       if (comp.init !== null) {
-        this.compileFuncs[comp.init.type](comp.init, compileTimeEnvExtend(ce, locals));
+        this.compileFuncs[comp.init.type](comp.init, forScope);
         }
       const start = this.wc;
       const jof = makeJOFInstr(0);
       // compile the condition
       if (comp.cond !== null) {
-        this.compileFuncs[comp.cond.type](comp.cond, compileTimeEnvExtend(ce, locals));
+        this.compileFuncs[comp.cond.type](comp.cond, forScope);
         this.instrs[this.wc++] = jof;
       }
       // compile the body
+      this.instrs[this.wc++] = makeENTER_SCOPEInstr(bodyLocals.length);
       comp.body.forEach((stmt) => {
-        this.compileFuncs[stmt.type](stmt, compileTimeEnvExtend(ce, locals));
+        this.compileFuncs[stmt.type](stmt, bodyScope);
         });
+      this.instrs[this.wc++] = makeEXIT_SCOPEInstr();
       // compile the post
       if (comp.post !== null) {
-        this.compileFuncs[comp.post.type](comp.post, compileTimeEnvExtend(ce, locals));
+        this.compileFuncs[comp.post.type](comp.post, forScope);
         }
       this.instrs[this.wc++] = makeGOTOInstr(start);
       jof.addr = this.wc;

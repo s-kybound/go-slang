@@ -71,7 +71,7 @@ export class Heap {
 
   // 1: [UNALLOCATED_TAG] 3: [unused] 4: [next free word address]
 
-  private readonly heap: DataView;
+  private heap: DataView;
 
   // free pointers are represented by a "linked list" of free nodes.
   private freePointer: number;
@@ -247,9 +247,9 @@ export class Heap {
     if (this.freePointer === -1) {
       // this is where we need to do GC
       this.garbageCollect();
-      // if, even after GC, we are out of memory, throw an error
+      // if, even after GC, we are out of memory, resort to resizing the heap
       if (this.freePointer === -1) {
-        throw new Error("Out of memory");
+        this.resizeHeap();
       }
     }
     // set the tag of the new node
@@ -262,6 +262,33 @@ export class Heap {
     this.setNumChildren(newNode, children);
 
     return newNode;
+  }
+
+  resizeHeap() {
+    console.log("Resizing the heap");
+    // get the old heap
+    const oldHeap = this.heap;
+    // get the old size
+    const oldSize = oldHeap.byteLength;
+    // get the new size
+    const newSize = oldSize * 2;
+    // create a new heap
+    const newHeap = new DataView(new ArrayBuffer(newSize));
+    // copy every word in the old heap to the new one
+    for (let i = 0; i < oldSize / WORD_SIZE; i++) {
+      newHeap.setFloat64(i * WORD_SIZE, oldHeap.getFloat64(i * WORD_SIZE));
+    }
+    // set the new heap
+    this.heap = newHeap;
+    // set the free pointer to the old size
+    this.freePointer = oldSize / WORD_SIZE;
+    // create the linked list of free pointers with the new size
+    let i = this.freePointer;
+    for (; (i + NODE_SIZE) * WORD_SIZE < newSize; i += NODE_SIZE) {
+      this.setFreePointerAtAddress(i, i + NODE_SIZE);
+    }
+    // finally, set the last free pointer to -1
+    this.setFreePointerAtAddress(i, -1);
   }
 
   mark(address: number) {
