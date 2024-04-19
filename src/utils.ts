@@ -13,5 +13,8 @@ export class Stack<T> {
   isEmpty() {
     return this.stack.length === 0;
   }
+  forEach(callback: (value: T, index: number, array: T[]) => void) {
+    this.stack.forEach(callback);
+  }
   constructor () {}
 }
