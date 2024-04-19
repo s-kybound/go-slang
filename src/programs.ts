@@ -195,3 +195,16 @@ func main() {
   return;
 }
 `;
+
+export const makeArrayStressTest = `
+func main() {
+  a := make_array(1000);
+  for i := 0; i < 1000; i = i + 1 {
+    a[i] = i;
+  }
+  for i := 0; i < 1000; i = i + 1 {
+    display(a[i]);
+  }
+  return;
+}
+`;
