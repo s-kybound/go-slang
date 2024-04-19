@@ -322,6 +322,30 @@ export class Goroutine {
         this.waitingOn = [];
         this.programCounter++;
         break;
+      case instr.InstrType.ACCESS_ADDRESS:
+        const index = this.operandStack.pop();
+        this.working.push(index);
+        const arr = this.operandStack.pop();
+        this.working.push(arr);
+        const addr = this.heap.accessArrayIndex(arr, index);
+        this.operandStack.push(addr);
+        this.working.pop();
+        this.working.pop();
+        this.programCounter++;
+        break;
+      case instr.InstrType.ASSIGN_ADDRESS:
+        const ind = this.operandStack.pop(); // index
+        const a = this.operandStack.pop(); // array
+        const v = this.operandStack.pop(); // value
+        this.working.push(ind);
+        this.working.push(a);
+        this.working.push(v);
+        this.heap.assignArrayIndex(a, ind, v);
+        this.working.pop();
+        this.working.pop();
+        this.working.pop();
+        this.programCounter++;
+        break;
       case instr.InstrType.DONE:
         this.done = true;
         break;

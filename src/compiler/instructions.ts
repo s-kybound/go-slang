@@ -28,6 +28,8 @@ export enum InstrType {
   ROF,
   BLOCK,
   CLEAR_WAIT,
+  ACCESS_ADDRESS,
+  ASSIGN_ADDRESS,
   DONE
 }
 
@@ -137,6 +139,10 @@ export interface CLEAR_WAITInstr extends BaseInstr {}
 
 export interface DONEInstr extends BaseInstr {}
 
+export interface ACCESS_ADDRESSInstr extends BaseInstr {}
+
+export interface ASSIGN_ADDRESSInstr extends BaseInstr {}
+
 export type Instr = 
   | LDCInstr 
   | UNOPInstr 
@@ -159,4 +165,6 @@ export type Instr =
   | ROFInstr
   | BLOCKInstr
   | CLEAR_WAITInstr
+  | ACCESS_ADDRESSInstr
+  | ASSIGN_ADDRESSInstr
   | DONEInstr;
