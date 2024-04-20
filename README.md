@@ -33,7 +33,7 @@ To build,
 
 ```bash
 $ git clone --recurse-submodules https://github.com/CS4215-AY2324S2-joy-kyriel/go-slang.git
-$ cd js-slang
+$ cd go-slang
 $ yarn
 $ yarn build
 ```
