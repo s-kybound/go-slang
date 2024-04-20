@@ -2,71 +2,25 @@ import { parse } from "./go-slang-parser/src"
 import { GoCompiler } from "./compiler/compiler"
 import { Runner } from "./runner/runner"
 import { Program } from "./go-slang-parser/src/parser_mapper/ast_types";
+import { Instr } from "./compiler/instructions";
 
-const program = 
-`
-const a, b, c number = 1, 2, 3;
+export async function compile(program: string): Promise<Instr[]> {
+  const ast = parse(program) as Program;
 
-func add(x, y number) number {
-  return x + y;
+  const compiler = new GoCompiler(ast);
+
+  compiler.compile();
+
+  return compiler.getInstrs();
 }
 
-func give_three() (number, number, number) {
-  return 4, 5, 6;
+export async function compile_and_run(
+  program: string,
+  quantum: number, 
+  size: number, 
+  inBytes: boolean): Promise<void> {
+
+  const instrs = await compile(program);
+  const runner = new Runner(instrs, quantum, size, inBytes);
+  runner.run();
 }
-
-func check(x, y, z number) {
-  display(x);
-  display(y);
-  display(z);
-}
-
-func async1() {
-  display("async1 running:");
-  for x := 0; x < 10000; x = x + 1 {
-    display(x);
-  }
-  display("async1 done");
-}
-
-func async2() {
-  display("async2 running:");
-  for x := 10000; x < 20000; x = x + 1 {
-    display(x);
-  }
-  display("async2 done");
-}
-
-func main() {
-  /*func inner() {
-    display("hello");
-  }
-  x, y, z := 1, 2, 3;
-  check(x, y, z);
-  x, y, z = give_three();
-  check(x, y, z);
-  check(a, b, c);
-  inner();*/
-  go async1();
-  go async2();
-  display("main running:");
-  display("7");
-  display("8");
-  display("9");
-  display("main done");
-}
-`
-
-const ast = parse(program) as Program;
-
-const compiler = new GoCompiler(ast);
-
-compiler.compile();
-
-const instructions = compiler.getInstrs();
-
-const QUANTUM = 22;
-
-const runner = new Runner(instructions, QUANTUM);
-
-runner.run();

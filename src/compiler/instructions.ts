@@ -4,6 +4,8 @@
 
 import { Value } from "../types";
 
+import { compileTimeEnvPosition } from "./compiler";
+
 export enum InstrType {
   LDC,
   UNOP,
@@ -20,6 +22,14 @@ export enum InstrType {
   TCALL,
   RESET,
   LAUNCH_THREAD,
+  SEND,
+  RECEIVE,
+  SOF,
+  ROF,
+  BLOCK,
+  CLEAR_WAIT,
+  ACCESS_ADDRESS,
+  ASSIGN_ADDRESS,
   DONE
 }
 
@@ -70,20 +80,24 @@ export interface GOTOInstr extends BaseInstr {
   addr: number;
 }
 
-export interface ENTER_SCOPEInstr extends BaseInstr {}
+export interface ENTER_SCOPEInstr extends BaseInstr {
+  syms: number;
+}
 
 export interface EXIT_SCOPEInstr extends BaseInstr {}
 
 export interface LDInstr extends BaseInstr {
   name: string;
+  pos: compileTimeEnvPosition;
 }
 
 export interface ASSIGNInstr extends BaseInstr {
   name: string;
+  pos: compileTimeEnvPosition;
 }
 
 export interface LDFInstr extends BaseInstr {
-  params: any[];
+  arity: number;
   addr: number;
 }
 
@@ -101,7 +115,33 @@ export interface LAUNCH_THREADInstr extends BaseInstr {
   addr: number;
 }
 
+// takes a channel from the OS - sends item to it or blocks
+export interface SENDInstr extends BaseInstr {}
+
+// takes a channel from the OS - receives from it or blocks
+export interface RECEIVEInstr extends BaseInstr {}
+
+// send-or-jump - sends item or jumps
+export interface SOFInstr extends BaseInstr {
+  addr: number
+}
+
+// receive-or-jump - receives item or jumps
+export interface ROFInstr extends BaseInstr {
+  addr: number
+}
+
+// blocks goroutine
+export interface BLOCKInstr extends BaseInstr {}
+
+// clears a goroutine of waiting channels
+export interface CLEAR_WAITInstr extends BaseInstr {}
+
 export interface DONEInstr extends BaseInstr {}
+
+export interface ACCESS_ADDRESSInstr extends BaseInstr {}
+
+export interface ASSIGN_ADDRESSInstr extends BaseInstr {}
 
 export type Instr = 
   | LDCInstr 
@@ -119,4 +159,12 @@ export type Instr =
   | TCALLInstr 
   | RESETInstr
   | LAUNCH_THREADInstr
+  | SENDInstr
+  | RECEIVEInstr
+  | SOFInstr
+  | ROFInstr
+  | BLOCKInstr
+  | CLEAR_WAITInstr
+  | ACCESS_ADDRESSInstr
+  | ASSIGN_ADDRESSInstr
   | DONEInstr;

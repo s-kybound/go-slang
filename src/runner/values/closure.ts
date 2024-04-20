@@ -22,6 +22,10 @@ export class Closure {
   getParams() {
     return this.params;
   }
+
+  toString() {
+    return `Closure(pc: ${this.pc}, env: ${this.env}, params: ${this.params})`;
+  }
 }
 
 export function isClosure(val: any): val is Closure {

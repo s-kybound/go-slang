@@ -6,6 +6,7 @@
 
 import { Value } from "../types";
 import { Builtin } from "./values/builtin";
+import { Channel } from "./values/channel";
 
 export class Environment {
   private parent: Environment | null = null;
@@ -38,9 +39,15 @@ export class Environment {
     throw new Error(`Variable ${name} not found`);
   }
 
-  // set the value of a variable
-  set(name: string, value: Value): void {
-    this.bindings.set(name, value);
+  // assign a variable with a value in the scope
+  assign(name: string, value: Value): void {
+    if (this.bindings.has(name)) {
+      this.bindings.set(name, value);
+    } else if (this.parent !== null) {
+      this.parent.assign(name, value);
+    } else {
+      throw new Error(`Variable ${name} not found`);
+    }
   }
 
   // create a new environment with this environment as the parent
@@ -49,4 +56,4 @@ export class Environment {
   }
 }
 
-export const globalEnvironment = new Environment(null, ["display"], [new Builtin((x: any) => console.log(x))]);
+export const globalEnvironment = new Environment(null, ["display", "makeChannel"], [new Builtin((x: any) => console.log(x)), new Builtin(() => new Channel())]);
