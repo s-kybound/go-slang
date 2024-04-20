@@ -106,12 +106,12 @@ function scanForVariables(node: ast_type.GoNode | null): string[] {
 }
 
 export class GoCompiler {
-  private ast: ast_type.Program;
+  private ast: ast_type.GoNode;
   private instrs: inst.Instr[];
   private compiled: boolean;
   private wc: number;
 
-  constructor(ast: ast_type.Program) {
+  constructor(ast: ast_type.GoNode) {
     this.ast = ast;
     this.instrs = [];
     this.compiled = false;
