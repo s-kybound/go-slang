@@ -1,0 +1,39 @@
+func main() {
+  // this should demonstrate that frames can contain a lot of declarations
+  const a, b, c number = 1, 2, 3;
+  const d, e, f number = 4, 5, 6;
+  const g, h, i number = 7, 8, 9;
+  const j, k, l number = 10, 11, 12;
+  const m, n, o number = 13, 14, 15;
+  const p, q, r number = 16, 17, 18;
+  const s, t, u number = 19, 20, 21;
+  const v, w, x number = 22, 23, 24;
+  const y, z number = 25, 26;
+  display(a);
+  display(b);
+  display(c);
+  display(d);
+  display(e);
+  display(f);
+  display(g);
+  display(h);
+  display(i);
+  display(j);
+  display(k);
+  display(l);
+  display(m);
+  display(n);
+  display(o);
+  display(p);
+  display(q);
+  display(r);
+  display(s);
+  display(t);
+  display(u);
+  display(v);
+  display(w);
+  display(x);
+  display(y);
+  display(z);
+  return;
+}

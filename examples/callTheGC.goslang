@@ -1,0 +1,8 @@
+// spawns a lot of numbers in the heap
+func main() {
+  // spawns a lot of numbers in the heap
+  for i := 0; i < 1000000; i = i + 1 {
+    display(i);
+  }
+  return;
+}
