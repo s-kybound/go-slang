@@ -1,5 +1,5 @@
 func main() {
-  if x := 1; true {
+  if true {
     display(x);
     display("true");
   } else {
