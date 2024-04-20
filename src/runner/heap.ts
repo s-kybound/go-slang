@@ -101,14 +101,26 @@ export class Heap {
   // constructor for the heap.
   // remember that the size is given in bytes.
   private constructor(size: number, runner: Runner) {
+    if (size < NODE_SIZE * WORD_SIZE) {
+      const min = NODE_SIZE * WORD_SIZE;
+      throw new Error(
+        `Heap size too small - please allocate more initial memory (at least ${min} bytes).`,
+      );
+    }
     this.runner = runner;
     this.freePointer = 0;
     this.heap = new DataView(new ArrayBuffer(size));
 
+    // set every node EXCEPT THE LAST to point to the next node
+    // allocableSize refers to the size of the heap that can be allocated.
+    // it ignores any remaining bytes that cannot fit a node.
+    const allocableSize = size - (size % (NODE_SIZE * WORD_SIZE));
+
     // then initialize the free pointers as required
     let i = 0;
-    // set every node EXCEPT THE LAST to point to the next node
-    for (; (i + NODE_SIZE) * WORD_SIZE < size; i += NODE_SIZE) {
+
+    // we mark every node EXCEPT THE LAST ONE as free.
+    for (; (i + NODE_SIZE) * WORD_SIZE < allocableSize; i += NODE_SIZE) {
       // set the value of the free pointer to the next free node
       this.setFreePointerAtAddress(i, i + NODE_SIZE);
     }
@@ -268,28 +280,35 @@ export class Heap {
   }
 
   resizeHeap() {
-    console.log("Resizing the heap");
-    // get the old heap
-    const oldHeap = this.heap;
     // get the old size
-    const oldSize = oldHeap.byteLength;
+    const oldSize = this.heap.byteLength;
     // get the new size
     const newSize = oldSize * 2;
+
+    console.error("Resizing heap from", oldSize, "bytes to", newSize, "bytes");
+
     // create a new heap
     const newHeap = new DataView(new ArrayBuffer(newSize));
+    const oldAllocableSize = oldSize - (oldSize % (NODE_SIZE * WORD_SIZE));
+    const newAllocableSize = newSize - (newSize % (NODE_SIZE * WORD_SIZE));
+
     // copy every word in the old heap to the new one
-    for (let i = 0; i < oldSize / WORD_SIZE; i++) {
-      newHeap.setFloat64(i * WORD_SIZE, oldHeap.getFloat64(i * WORD_SIZE));
+    for (let i = 0; i < oldAllocableSize / WORD_SIZE; i++) {
+      newHeap.setFloat64(i * WORD_SIZE, this.heap.getFloat64(i * WORD_SIZE));
     }
+
     // set the new heap
     this.heap = newHeap;
+
     // set the free pointer to the old size
-    this.freePointer = oldSize / WORD_SIZE;
+    this.freePointer = oldAllocableSize / WORD_SIZE;
+
     // create the linked list of free pointers with the new size
     let i = this.freePointer;
-    for (; (i + NODE_SIZE) * WORD_SIZE < newSize; i += NODE_SIZE) {
+    for (; (i + NODE_SIZE) * WORD_SIZE < newAllocableSize; i += NODE_SIZE) {
       this.setFreePointerAtAddress(i, i + NODE_SIZE);
     }
+
     // finally, set the last free pointer to -1
     this.setFreePointerAtAddress(i, -1);
   }
@@ -350,7 +369,7 @@ export class Heap {
         }
         // if the first node is unmarked, we free it.
         this.free(current);
-        console.log("Freeing", current);
+        //console.log("Freeing", current);
       }
       // unmark this node
       this.unmark(current);
@@ -360,7 +379,7 @@ export class Heap {
   }
 
   garbageCollect() {
-    console.log("Garbage collecting");
+    console.error("Garbage collecting");
     // mark and sweep algorithm
     // mark all of the literals
     this.mark(this.False);
@@ -551,7 +570,7 @@ export class Heap {
     const offset = children % 8;
 
     // allocate the first node
-    addr = this.allocate(tag, numExtensions > 0 ? 9 : offset);
+    addr = this.allocate(tag, children > 8 ? 9 : children);
     // protect the address from GC
     this.working.push(addr);
     numberAdded++;
@@ -568,8 +587,11 @@ export class Heap {
     if (numExtensions > 0) {
       // allocate the extensions
       for (let i = 0; i < numExtensions; i++) {
+        // if this is the last extension,
+        // we need to set the number of children to the offset
+        // except if the offset is 0, in which case we set it to 8
         const ext = this.allocateExtension(
-          i === numExtensions - 1 ? offset : 9,
+          i === numExtensions - 1 ? (offset === 0 ? 8 : offset) : 9,
         );
         // protect the extension from GC
         this.working.push(ext);
@@ -1083,7 +1105,6 @@ export class Heap {
     if (this.isUndefined(address)) {
       return undefined;
     }
-    //console.log(this.typeOfTag(this.getTag(address)));
     throw new Error("Unsupported address");
   }
 

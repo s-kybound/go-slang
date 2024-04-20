@@ -194,11 +194,18 @@ func main() {
 `;
 
 export const makeArrayStressTest = `
+// you may want to run this on a runner with
+// little memory to exhibit our capability to
+// resize the heap
 func main() {
+  display("allocating array");
   a := make_array(10000);
+  display("array allocated");
+  display("filling array");
   for i := 0; i < 10000; i = i + 1 {
     a[i] = i;
   }
+  display("array filled");
   for i := 0; i < 10000; i = i + 1 {
     display(a[i]);
   }

@@ -14,6 +14,15 @@ export const stdlib: Stdlib = {
     },
   ],
 
+  display_address: [
+    1,
+    (g: Goroutine) => {
+      const addr = g.operandStack.pop();
+      console.log(addr);
+      return addr;
+    },
+  ],
+
   make_channel: [
     0,
     (g: Goroutine) => {
