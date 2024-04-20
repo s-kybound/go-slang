@@ -83,5 +83,7 @@ Several example programs are left in the `examples` folder. Give them a try!
 
 ## Current issues
 
+### Erroneous behaviour with too little memory
+
 _go-slang_ is able to resize its heap during runtime, if garbage collection fails to free memory. However, starting a program with too little
 memory may impact the correctness of _go-slang_ in program execution. (for example, `example/fibonacci.goslang` fails to execute properly with less than 4320 bytes) While we prevent you from allocating less than 80 bytes (the size of a single node), do be careful with the number of bytes allocated to your program!
