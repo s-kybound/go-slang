@@ -1,12 +1,25 @@
 # go-slang
 
-An implementation of a subset of the language _Go_, created for CS4215 term project for AY23/24 Semester 2
-
 ## Table of Contents
 
+- [About](#about)
 - [Prerequisites](#prerequisites)
 - [Usage](#usage)
 - [Testing](#testing)
+
+## About
+
+An implementation of a subset of the language _Go_, created for CS4215 term project for AY23/24 Semester 2.
+
+Currently, our implementation exhibits the following features:
+
+- Concurrent execution achieved with timeslicing
+- Synchronization primitives with unbuffered channels
+- Support for select-case statement
+- Mark-and-sweep Garbage Collection
+- Dynamic resizing of heap
+
+All in all, our implementation allows learners to reason about and play with the message passing paradigm using _Go_. 
 
 ## Prerequisites
 
