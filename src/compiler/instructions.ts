@@ -1,10 +1,10 @@
-/** 
+/**
  * This file contains the instruction set of our compiler.
  */
 
-import { Value } from "../types";
-
 import { compileTimeEnvPosition } from "./compiler";
+
+export type Value = any;
 
 export enum InstrType {
   LDC,
@@ -30,12 +30,12 @@ export enum InstrType {
   CLEAR_WAIT,
   ACCESS_ADDRESS,
   ASSIGN_ADDRESS,
-  DONE
+  DONE,
 }
 
 export enum UnopType {
   NEG,
-  NOT
+  NOT,
 }
 
 export enum BinopType {
@@ -51,7 +51,7 @@ export enum BinopType {
   LT,
   GT,
   LE,
-  GE
+  GE,
 }
 
 export interface BaseInstr {
@@ -123,12 +123,12 @@ export interface RECEIVEInstr extends BaseInstr {}
 
 // send-or-jump - sends item or jumps
 export interface SOFInstr extends BaseInstr {
-  addr: number
+  addr: number;
 }
 
 // receive-or-jump - receives item or jumps
 export interface ROFInstr extends BaseInstr {
-  addr: number
+  addr: number;
 }
 
 // blocks goroutine
@@ -143,20 +143,20 @@ export interface ACCESS_ADDRESSInstr extends BaseInstr {}
 
 export interface ASSIGN_ADDRESSInstr extends BaseInstr {}
 
-export type Instr = 
-  | LDCInstr 
-  | UNOPInstr 
-  | BINOPInstr 
-  | POPInstr 
-  | JOFInstr 
-  | GOTOInstr 
-  | ENTER_SCOPEInstr 
-  | EXIT_SCOPEInstr 
-  | LDInstr 
-  | ASSIGNInstr 
-  | LDFInstr 
-  | CALLInstr 
-  | TCALLInstr 
+export type Instr =
+  | LDCInstr
+  | UNOPInstr
+  | BINOPInstr
+  | POPInstr
+  | JOFInstr
+  | GOTOInstr
+  | ENTER_SCOPEInstr
+  | EXIT_SCOPEInstr
+  | LDInstr
+  | ASSIGNInstr
+  | LDFInstr
+  | CALLInstr
+  | TCALLInstr
   | RESETInstr
   | LAUNCH_THREADInstr
   | SENDInstr

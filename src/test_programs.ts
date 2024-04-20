@@ -1,10 +1,10 @@
-import { parse } from "./go-slang-parser/src"
-import { GoCompiler } from "./compiler/compiler"
-import { Runner } from "./runner/runner"
+import { parse } from "./go-slang-parser/src";
+import { GoCompiler } from "./compiler/compiler";
+import { Runner } from "./runner/runner";
 import { Program } from "./go-slang-parser/src/parser_mapper/ast_types";
 import * as programs from "./programs";
 
-const program = programs.fibonacci
+const program = programs.fibonacci;
 
 const ast = parse(program) as Program;
 

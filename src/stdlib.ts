@@ -5,55 +5,82 @@ export interface Stdlib {
 }
 
 export const stdlib: Stdlib = {
-  display: [1, (g: Goroutine) => { 
-    const addr = g.operandStack.pop();
-    console.log(g.heap.addressToValue(addr));
-    return addr; 
-  }],
+  display: [
+    1,
+    (g: Goroutine) => {
+      const addr = g.operandStack.pop();
+      console.log(g.heap.addressToValue(addr));
+      return addr;
+    },
+  ],
 
-  make_channel: [0, (g: Goroutine) => {
-    const channel = g.heap.allocateChannel();
-    return channel;
-  }],
+  make_channel: [
+    0,
+    (g: Goroutine) => {
+      const channel = g.heap.allocateChannel();
+      return channel;
+    },
+  ],
 
-  make_array: [1, (g: Goroutine) => {
-    const size = g.operandStack.pop();
-    const sizeValue = g.heap.addressToValue(size);
-    const array = g.heap.allocateArray(sizeValue);
-    return array;
-  }],
+  make_array: [
+    1,
+    (g: Goroutine) => {
+      const size = g.operandStack.pop();
+      const sizeValue = g.heap.addressToValue(size);
+      const array = g.heap.allocateArray(sizeValue);
+      return array;
+    },
+  ],
 
-  is_number: [1, (g: Goroutine) => {
-    const addr = g.operandStack.pop();
-    return g.heap.valueToAddress(g.heap.isNumber(addr));
-  }],
+  is_number: [
+    1,
+    (g: Goroutine) => {
+      const addr = g.operandStack.pop();
+      return g.heap.valueToAddress(g.heap.isNumber(addr));
+    },
+  ],
 
-  is_boolean: [1, (g: Goroutine) => {
-    const addr = g.operandStack.pop();
-    return g.heap.valueToAddress(g.heap.isBoolean(addr));
-  }],
+  is_boolean: [
+    1,
+    (g: Goroutine) => {
+      const addr = g.operandStack.pop();
+      return g.heap.valueToAddress(g.heap.isBoolean(addr));
+    },
+  ],
 
-  is_string: [1, (g: Goroutine) => {
-    const addr = g.operandStack.pop();
-    return g.heap.valueToAddress(g.heap.isString(addr));
-  }],
+  is_string: [
+    1,
+    (g: Goroutine) => {
+      const addr = g.operandStack.pop();
+      return g.heap.valueToAddress(g.heap.isString(addr));
+    },
+  ],
 
-  is_undefined: [1, (g: Goroutine) => {
-    const addr = g.operandStack.pop();
-    return g.heap.valueToAddress(g.heap.isUndefined(addr));
-  }],
+  is_undefined: [
+    1,
+    (g: Goroutine) => {
+      const addr = g.operandStack.pop();
+      return g.heap.valueToAddress(g.heap.isUndefined(addr));
+    },
+  ],
 
-  is_function: [1, (g: Goroutine) => {
-    const addr = g.operandStack.pop();
-    return g.heap.valueToAddress(g.heap.isClosure(addr));
-  }],
+  is_function: [
+    1,
+    (g: Goroutine) => {
+      const addr = g.operandStack.pop();
+      return g.heap.valueToAddress(g.heap.isClosure(addr));
+    },
+  ],
 
-  math_sqrt: [1, (g: Goroutine) => {
-    const addr = g.operandStack.pop();
-    const value = g.heap.addressToValue(addr);
-    return g.heap.valueToAddress(Math.sqrt(value));
-  }],
-}
+  math_sqrt: [
+    1,
+    (g: Goroutine) => {
+      const addr = g.operandStack.pop();
+      const value = g.heap.addressToValue(addr);
+      return g.heap.valueToAddress(Math.sqrt(value));
+    },
+  ],
+};
 
 export interface Constants {
   [key: string]: number;
@@ -68,4 +95,4 @@ export const constants: Constants = {
   math_PI: Math.PI,
   math_SQRT1_2: Math.SQRT1_2,
   math_SQRT2: Math.SQRT2,
-}
+};

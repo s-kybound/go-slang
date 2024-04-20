@@ -1,16 +1,11 @@
+// a program used to showcase go-slang's message passing and synchronisation capabilities
 export const fibonacci = `
 func fibonacci(c, quit chan int) {
 	x, y := 0, 1;
 	for ;;{
 		select {
 		case c <- x:
-			//display("before");
-			//display(x);
 			x, y = y, x+y;
-			//display("after");
-			//display(x);
-		//default:
-			//display("default");
 		case <- quit:
 			display("quit");
 			return 0;
@@ -22,16 +17,18 @@ func main() {
 	display("Hello, World!");
 	c := make_channel();
 	quit := make_channel();
-	funisdone := make_channel();
+  // this is treated as a daemon goroutine that
+  // waits on channel c to display the fibonacci numbers
 	go func() {
 		for i := 0; i < 10; i = i + 1 {
-			display(<-c);
+      // this is a blocking operation
+      // it will wait for the main goroutine to send a value
+      // in fibonacci
+      display(<-c);
 		}
 		quit <- 0;
-		//funisdone <- 0;
 	}();
 	fibonacci(c, quit);
-	//<-funisdone;
 }
 `;
 
@@ -90,7 +87,7 @@ func main() {
   <-d;
   display("main done");
 }
-`
+`;
 
 export const calltheGC = `
 func main() {
@@ -100,7 +97,7 @@ func main() {
   }
   return;
 }
-`
+`;
 
 export const lotsOfDeclarations = `
 func main() {

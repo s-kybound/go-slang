@@ -25,7 +25,7 @@ import {
   makeDONEInstr,
   makeCLEAR_WAITInstr,
   makeACCESS_ADDRESSInstr,
-  makeASSIGN_ADDRESSInstr
+  makeASSIGN_ADDRESSInstr,
 } from "./instr_maker";
 
 import * as inst from "./instructions";
@@ -48,7 +48,10 @@ function compileTimeEnvExtend(ce: compileTimeEnv, vars: frame): compileTimeEnv {
 // represents the frame index and the second number represents the variable index in the frame.
 export type compileTimeEnvPosition = [number, number];
 
-function compileTimeEnvPosition(ce: compileTimeEnv, name: string): compileTimeEnvPosition {
+function compileTimeEnvPosition(
+  ce: compileTimeEnv,
+  name: string,
+): compileTimeEnvPosition {
   let frameIndex;
   // trace the ce BACKWARDS to find the first frame
   // containing an instance for the variable
@@ -70,10 +73,13 @@ interface CompileFuncs {
   [key: string]: (comp: any, ce: compileTimeEnv) => void;
 }
 
-const global_compile_frame: frame = [...Object.keys(stdlib), ...Object.keys(constants)];
+const global_compile_frame: frame = [
+  ...Object.keys(stdlib),
+  ...Object.keys(constants),
+];
 const global_compile_env: compileTimeEnv = [global_compile_frame];
 
-// search for all variables in a node. will allow us to 
+// search for all variables in a node. will allow us to
 // assign variables to memory locations at compile time.
 function scanForVariables(node: ast_type.GoNode | null): string[] {
   if (node === null) {
@@ -186,32 +192,38 @@ export class GoCompiler {
       const programScope = compileTimeEnvExtend(ce, locals);
       comp.top_declarations.forEach((decl) => {
         this.compileFuncs[decl.type](decl, programScope);
-        });
+      });
       // add a call to main()
-      this.instrs[this.wc++] = makeLDInstr("main", compileTimeEnvPosition(programScope, "main"));
+      this.instrs[this.wc++] = makeLDInstr(
+        "main",
+        compileTimeEnvPosition(programScope, "main"),
+      );
       this.instrs[this.wc++] = makeCALLInstr(0);
       this.instrs[this.wc++] = makeEXIT_SCOPEInstr();
       this.instrs[this.wc++] = makeDONEInstr();
-      },
+    },
     emptyStatement: (comp: ast_type.EmptyStatement, ce: compileTimeEnv) => {
       // do nothing
-      },
+    },
     identifier: (comp: ast_type.Identifier, ce: compileTimeEnv) => {
-      this.instrs[this.wc++] = makeLDInstr(comp.name, compileTimeEnvPosition(ce, comp.name));
-      },
+      this.instrs[this.wc++] = makeLDInstr(
+        comp.name,
+        compileTimeEnvPosition(ce, comp.name),
+      );
+    },
     literal: (comp: ast_type.Literal, ce: compileTimeEnv) => {
       this.instrs[this.wc++] = makeLDCInstr(comp.value);
-      },
+    },
     application: (comp: ast_type.Application, ce: compileTimeEnv) => {
       // compile the operator
       this.compileFuncs[comp.operator.type](comp.operator, ce);
       // compile the operands
       comp.operands.forEach((operand) => {
         this.compileFuncs[operand.type](operand, ce);
-        });
+      });
       // add a call instruction
       this.instrs[this.wc++] = makeCALLInstr(comp.operands.length);
-      },
+    },
     declaration: (comp: ast_type.Declaration, ce: compileTimeEnv) => {
       // TODO: some sort of check to make sure
       // number of ids and vals are the same?
@@ -224,49 +236,61 @@ export class GoCompiler {
       // compile every value
       comp.vals.forEach((val) => {
         this.compileFuncs[val.type](val, ce);
-        });
+      });
       // then compile every name
       comp.ids.reverse().forEach((id) => {
-        this.instrs[this.wc++] = makeASSIGNInstr(id.name, compileTimeEnvPosition(ce, id.name));
-        });
-      },
+        this.instrs[this.wc++] = makeASSIGNInstr(
+          id.name,
+          compileTimeEnvPosition(ce, id.name),
+        );
+      });
+    },
     unop: (comp: ast_type.UnOp, ce: compileTimeEnv) => {
       this.compileFuncs[comp.expr.type](comp.expr, ce);
       const opcode: inst.UnopType = this.getUnopType(comp.opcode);
       // match the opcode to the enum type
       this.instrs[this.wc++] = makeUNOPInstr(opcode);
-      },
+    },
     binop: (comp: ast_type.BinOp, ce: compileTimeEnv) => {
       this.compileFuncs[comp.left.type](comp.left, ce);
       this.compileFuncs[comp.right.type](comp.right, ce);
       const opcode: inst.BinopType = this.getBinopType(comp.opcode);
       // match the opcode to the enum type
       this.instrs[this.wc++] = makeBINOPInstr(opcode);
-      },
-    expressionStatement: (comp: ast_type.ExpressionStatement, ce: compileTimeEnv) => {
+    },
+    expressionStatement: (
+      comp: ast_type.ExpressionStatement,
+      ce: compileTimeEnv,
+    ) => {
       this.compileFuncs[comp.expression.type](comp.expression, ce);
       this.instrs[this.wc++] = makePOPInstr();
-      },
+    },
     returnStatement: (comp: ast_type.ReturnStatement, ce: compileTimeEnv) => {
       // check for the tail call condition
-      if (comp.expressions.length === 1 && comp.expressions[0].type === "application") {
+      if (
+        comp.expressions.length === 1 &&
+        comp.expressions[0].type === "application"
+      ) {
         // currently do nothing
       }
       // compile every expression
       comp.expressions.forEach((expr) => {
         this.compileFuncs[expr.type](expr, ce);
-        });
+      });
       this.instrs[this.wc++] = makeRESETInstr();
-      },
-    assignmentStatement: (comp: ast_type.AssignmentStatement, ce: compileTimeEnv) => {
+    },
+    assignmentStatement: (
+      comp: ast_type.AssignmentStatement,
+      ce: compileTimeEnv,
+    ) => {
       // TODO: some sort of check to make sure
       // number of ids and vals are the same?
       // perhaps we do this with the type checker
-      
+
       // compile every value
       comp.vals.forEach((val) => {
         this.compileFuncs[val.type](val, ce);
-        });
+      });
       // then compile every name, in reverse
       comp.ids.reverse().forEach((id) => {
         if (id.type === "indexAccess") {
@@ -282,9 +306,12 @@ export class GoCompiler {
         }
         // id is an identifier
         id = id as ast_type.Identifier;
-        this.instrs[this.wc++] = makeASSIGNInstr(id.name, compileTimeEnvPosition(ce, id.name));
-        });
-      },
+        this.instrs[this.wc++] = makeASSIGNInstr(
+          id.name,
+          compileTimeEnvPosition(ce, id.name),
+        );
+      });
+    },
     ifStatement: (comp: ast_type.IfStatement, ce: compileTimeEnv) => {
       // get the local variables in the if statement
       let ifStatementLocals: string[] = scanForVariables(comp.short);
@@ -304,7 +331,7 @@ export class GoCompiler {
       this.instrs[this.wc++] = makeENTER_SCOPEInstr(consLocals.length);
       comp.cons.forEach((stmt) => {
         this.compileFuncs[stmt.type](stmt, consScope);
-        });
+      });
       this.instrs[this.wc++] = makeEXIT_SCOPEInstr();
       const goto = makeGOTOInstr(0);
       this.instrs[this.wc++] = goto;
@@ -313,9 +340,9 @@ export class GoCompiler {
         this.instrs[this.wc++] = makeENTER_SCOPEInstr(altLocals.length);
         comp.alt.forEach((stmt) => {
           this.compileFuncs[stmt.type](stmt, altScope);
-          });
+        });
         this.instrs[this.wc++] = makeEXIT_SCOPEInstr();
-        }
+      }
       goto.addr = this.wc;
       this.instrs[this.wc++] = makeEXIT_SCOPEInstr();
     },
@@ -333,7 +360,7 @@ export class GoCompiler {
       // compile the initializer
       if (comp.init !== null) {
         this.compileFuncs[comp.init.type](comp.init, forScope);
-        }
+      }
       const start = this.wc;
       const jof = makeJOFInstr(0);
       // compile the condition
@@ -345,12 +372,12 @@ export class GoCompiler {
       this.instrs[this.wc++] = makeENTER_SCOPEInstr(bodyLocals.length);
       comp.body.forEach((stmt) => {
         this.compileFuncs[stmt.type](stmt, bodyScope);
-        });
+      });
       this.instrs[this.wc++] = makeEXIT_SCOPEInstr();
       // compile the post
       if (comp.post !== null) {
         this.compileFuncs[comp.post.type](comp.post, forScope);
-        }
+      }
       this.instrs[this.wc++] = makeGOTOInstr(start);
       jof.addr = this.wc;
       // exit the scope
@@ -370,10 +397,10 @@ export class GoCompiler {
     function: (comp: ast_type.FunctionNode, ce: compileTimeEnv) => {
       // this one does double work - if we have a function name, we need to assign it
       // otherwise its just a function VALUE
-      
+
       // compile the function as a literal
       this.instrs[this.wc++] = makeLDFInstr(comp.formals.length, this.wc + 1);
-      const goto = makeGOTOInstr(0)
+      const goto = makeGOTOInstr(0);
       this.instrs[this.wc++] = goto;
       // scan the function body + formals for variables
       // identifiers aren't detected by scanForVariables so we do something different
@@ -382,11 +409,14 @@ export class GoCompiler {
       // console.log(`locals: ${locals.length}`)
       // create a new scope
       this.instrs[this.wc++] = makeENTER_SCOPEInstr(fnBody.length);
-      const functionScope = compileTimeEnvExtend(compileTimeEnvExtend(ce, locals), fnBody);
+      const functionScope = compileTimeEnvExtend(
+        compileTimeEnvExtend(ce, locals),
+        fnBody,
+      );
       // compile the function body
       comp.body.forEach((stmt) => {
         this.compileFuncs[stmt.type](stmt, functionScope);
-        });
+      });
       // add undefined, if we need it
       this.instrs[this.wc++] = makeLDCInstr(undefined);
       this.instrs[this.wc++] = makeRESETInstr();
@@ -396,7 +426,10 @@ export class GoCompiler {
       goto.addr = this.wc;
 
       if (comp.name) {
-        this.instrs[this.wc++] = makeASSIGNInstr(comp.name.name, compileTimeEnvPosition(ce, comp.name.name));
+        this.instrs[this.wc++] = makeASSIGNInstr(
+          comp.name.name,
+          compileTimeEnvPosition(ce, comp.name.name),
+        );
       }
     },
     sendStatement: (comp: ast_type.SendStatement, ce: compileTimeEnv) => {
@@ -406,13 +439,20 @@ export class GoCompiler {
       this.compileFuncs[comp.val.type](comp.val, ce);
       // add the send instruction - depends on whether we are in a select statement
       // or not.
-      this.instrs[this.wc++] = comp.inSelect ? makeSOFInstr(0) : makeSENDInstr();
+      this.instrs[this.wc++] = comp.inSelect
+        ? makeSOFInstr(0)
+        : makeSENDInstr();
     },
-    receiveExpression: (comp: ast_type.ReceiveExpression, ce: compileTimeEnv) => {
+    receiveExpression: (
+      comp: ast_type.ReceiveExpression,
+      ce: compileTimeEnv,
+    ) => {
       // compile the channel
       this.compileFuncs[comp.chan.type](comp.chan, ce);
       // add the receive instruction - depends on whether we are in a select statement
-      this.instrs[this.wc++] = comp.inSelect ? makeROFInstr(0) : makeRECEIVEInstr();
+      this.instrs[this.wc++] = comp.inSelect
+        ? makeROFInstr(0)
+        : makeRECEIVEInstr();
     },
     indexAccess: (comp: ast_type.IndexAccess, ce: compileTimeEnv) => {
       // compile the accessed
@@ -441,7 +481,7 @@ export class GoCompiler {
       // of the select statement
       const caseGotos: inst.GOTOInstr[] = [];
       // compile every case
-      // we don't handle select and default cases outside of the select statement, as 
+      // we don't handle select and default cases outside of the select statement, as
       // they won't exist outside
       comp.cases.forEach((c) => {
         // there are 2 cases - the default case and the select case
@@ -450,7 +490,10 @@ export class GoCompiler {
           const def = c as ast_type.DefaultCase;
           // compile default case - this is just a block
           def.body.forEach((stmt) => {
-            this.compileFuncs[stmt.type](stmt, compileTimeEnvExtend(ce, locals));
+            this.compileFuncs[stmt.type](
+              stmt,
+              compileTimeEnvExtend(ce, locals),
+            );
           });
           // add a goto instruction that points to the end of the select statement
           const defaultGoto = makeGOTOInstr(0);
@@ -463,12 +506,18 @@ export class GoCompiler {
         let currSF = this.wc;
         let rofOrSof;
         // compile the select case statement
-        this.compileFuncs[sel.statement.type](sel.statement, compileTimeEnvExtend(ce, locals));
+        this.compileFuncs[sel.statement.type](
+          sel.statement,
+          compileTimeEnvExtend(ce, locals),
+        );
 
         // we need to find the SOF or ROF instruction that was just added -
         // we are assured it exists - as the parser prevents a select case without a SOF or ROF.
         for (let i = currSF; i < this.wc; i++) {
-          if (this.instrs[i].type === inst.InstrType.SOF || this.instrs[i].type === inst.InstrType.ROF) {
+          if (
+            this.instrs[i].type === inst.InstrType.SOF ||
+            this.instrs[i].type === inst.InstrType.ROF
+          ) {
             rofOrSof = this.instrs[i] as inst.SOFInstr | inst.ROFInstr;
             break;
           }
@@ -482,13 +531,13 @@ export class GoCompiler {
         sel.body.forEach((stmt) => {
           this.compileFuncs[stmt.type](stmt, compileTimeEnvExtend(ce, locals));
         });
-        
+
         // add a goto instruction that points to the end of the select statement
         const caseGoto = makeGOTOInstr(0);
         this.instrs[this.wc++] = caseGoto;
         caseGotos.push(caseGoto);
 
-        // set the address of the rof or sof to the current wc - this will 
+        // set the address of the rof or sof to the current wc - this will
         // make it jump to the very next case
         rofOrSof.addr = this.wc;
         return;
@@ -498,7 +547,7 @@ export class GoCompiler {
       // we will land on this goto, which will
       // block the goroutine
       this.instrs[this.wc++] = makeGOTOInstr(blockaddr);
-      
+
       // otherwise, the cases should jump to the instruction after this block
       // right here - this is the end of the select statement
       caseGotos.forEach((goto) => {
@@ -510,6 +559,6 @@ export class GoCompiler {
 
       // then we exit the scope
       this.instrs[this.wc++] = makeEXIT_SCOPEInstr();
-    }
-  }
+    },
+  };
 }

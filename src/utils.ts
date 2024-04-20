@@ -7,7 +7,7 @@ export class Stack<T> {
     if (this.stack.length === 0) {
       throw new Error("Stack is empty");
     }
-    const res = this.stack.pop()
+    const res = this.stack.pop();
     return res as T;
   }
   isEmpty() {
@@ -16,5 +16,5 @@ export class Stack<T> {
   forEach(callback: (value: T, index: number, array: T[]) => void) {
     this.stack.forEach(callback);
   }
-  constructor () {}
+  constructor() {}
 }

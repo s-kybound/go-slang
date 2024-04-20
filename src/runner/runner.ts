@@ -16,17 +16,29 @@ export class Runner {
   private readonly quantum: number;
 
   /**
-   * 
+   *
    * @param instructions the compiled instructions for the program.
    * @param quantum the quantum each goroutine is allowed to run for. (removed once webworkers are added).
    * @param size the size of memory (in megabytes)
    */
-  constructor(instructions: instr.Instr[], quantum: number, size: number, withBytes: boolean = false) {
+  constructor(
+    instructions: instr.Instr[],
+    quantum: number,
+    size: number,
+    withBytes: boolean = false,
+  ) {
     this.instructions = instructions;
     this.quantum = quantum;
-    this.heap = withBytes ? Heap.createWithBytes(size, this) : Heap.create(size, this);
+    this.heap = withBytes
+      ? Heap.createWithBytes(size, this)
+      : Heap.create(size, this);
     this.programEnvironment = this.heap.globalEnv;
-    this.mainGoroutine = new Goroutine(0, this, this.instructions, this.programEnvironment);
+    this.mainGoroutine = new Goroutine(
+      0,
+      this,
+      this.instructions,
+      this.programEnvironment,
+    );
     this.goroutines = [this.mainGoroutine];
     this.currGoroutine = 0;
   }
@@ -60,10 +72,14 @@ export class Runner {
     let foundGoroutine = false;
     for (let i = 0; i < currLength; i++) {
       // get the next goroutine
-      const goroutineToCheck = (this.currGoroutine + i + 1) % this.goroutines.length;
+      const goroutineToCheck =
+        (this.currGoroutine + i + 1) % this.goroutines.length;
 
       // if the goroutine is done, we will clean it up.
-      if (this.goroutines[goroutineToCheck].isDone() && goroutineToCheck !== 0) {
+      if (
+        this.goroutines[goroutineToCheck].isDone() &&
+        goroutineToCheck !== 0
+      ) {
         toClean.push(goroutineToCheck);
         continue;
       }
@@ -75,7 +91,7 @@ export class Runner {
 
       // if the goroutine is blocked, we will check if we can unblock it.
       if (this.goroutines[goroutineToCheck].isBlocked()) {
-        // we have found a blocked goroutine, we will reason about it 
+        // we have found a blocked goroutine, we will reason about it
         // and check if it can be unblocked.
         if (this.goroutines[goroutineToCheck].waitingChannelIsFree()) {
           this.goroutines[goroutineToCheck].unblock();
@@ -96,12 +112,14 @@ export class Runner {
     }
 
     // clean up goroutines marked as done in reverse order and adjust the nextGoroutine index
-    toClean.sort((a, b) => b - a).forEach(index => {
-      this.goroutines.splice(index, 1);
-      if (index < this.currGoroutine) {
-        this.currGoroutine--; // adjust the index due to the removal of goroutines before it
-      }
-    });
+    toClean
+      .sort((a, b) => b - a)
+      .forEach((index) => {
+        this.goroutines.splice(index, 1);
+        if (index < this.currGoroutine) {
+          this.currGoroutine--; // adjust the index due to the removal of goroutines before it
+        }
+      });
 
     string += this.currGoroutine;
     // console.log(string);

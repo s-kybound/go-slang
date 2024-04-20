@@ -2,7 +2,7 @@ import { stdlib, constants, Stdlib, Constants } from "../stdlib";
 import { Runner } from "./runner";
 
 // a representation of the heap, which stores all data in the program.
-// for go-slang, we use a fixed-size big-endian heap 
+// for go-slang, we use a fixed-size big-endian heap
 // using tagged pointers that uses
 // a first-fit allocation strategy.
 
@@ -67,7 +67,7 @@ export class Heap {
   // 1: [tag] 1: [gc] 2: [children] 4: [metadata]
 
   // an unallocated word is represented with a tag and
-  // a next free address, represented as follows: 
+  // a next free address, represented as follows:
 
   // 1: [UNALLOCATED_TAG] 3: [unused] 4: [next free word address]
 
@@ -179,7 +179,10 @@ export class Heap {
     this.setWord(addr + 1, frame);
 
     // revert the working set by the amount added
-    this.working = this.working.slice(0, this.working.length - numAddedToWorking);
+    this.working = this.working.slice(
+      0,
+      this.working.length - numAddedToWorking,
+    );
     return addr;
   }
 
@@ -367,7 +370,7 @@ export class Heap {
     this.mark(this.Unallocated);
 
     // mark everything in the working set
-    this.working.forEach(address => this.markRecursive(address));
+    this.working.forEach((address) => this.markRecursive(address));
 
     // recursively mark the global environment
     this.markRecursive(this.globalEnv);
@@ -391,7 +394,7 @@ export class Heap {
   isFalse(address: number): boolean {
     return this.getTag(address) === Tag.FALSE;
   }
-  
+
   isTrue(address: number): boolean {
     return this.getTag(address) === Tag.TRUE;
   }
@@ -477,7 +480,7 @@ export class Heap {
     return address;
   }
 
-  // channels are represented as a tagged pointer. 
+  // channels are represented as a tagged pointer.
   // they have 2 children: hasItem, which points to either
   // FALSE or TRUE, and item, which points to the item in the channel.
   allocateChannel(): number {
@@ -535,7 +538,7 @@ export class Heap {
   // an abstraction for allocating a new item with any number of children.
   // this is useful for arrays, slices, closures, and environments.
   allocateItemWithExtension(tag: Tag, children: number): number {
-     // check the size of the item - how many extensions do we need?
+    // check the size of the item - how many extensions do we need?
     let addr: number;
 
     // track the number of objects added to the working set
@@ -543,7 +546,7 @@ export class Heap {
 
     // from the number of children given, we can calculate the number of extensions required
     const numExtensions = children === 0 ? 0 : Math.ceil(children / 8) - 1;
-    
+
     // the remainder of the children
     const offset = children % 8;
 
@@ -552,7 +555,7 @@ export class Heap {
     // protect the address from GC
     this.working.push(addr);
     numberAdded++;
-    
+
     // set all children to UNALLOCATED
     // we don't need to care about the offset since
     // our logic will prevent us from accessing the children
@@ -565,7 +568,9 @@ export class Heap {
     if (numExtensions > 0) {
       // allocate the extensions
       for (let i = 0; i < numExtensions; i++) {
-        const ext = this.allocateExtension(i === numExtensions - 1 ? offset : 9);
+        const ext = this.allocateExtension(
+          i === numExtensions - 1 ? offset : 9,
+        );
         // protect the extension from GC
         this.working.push(ext);
         numberAdded++;
@@ -594,7 +599,7 @@ export class Heap {
   // the metadata consists of the size of the array.
   allocateArray(size: number): number {
     let addr = this.allocateItemWithExtension(Tag.ARRAY, size);
-    
+
     // set the last 4 bytes to the size of the array
     this.heap.setInt32(addr * WORD_SIZE + 4, size);
 
@@ -609,7 +614,7 @@ export class Heap {
       throw new Error("Index is not a number");
     }
 
-    const indexValue = this.addressToValue(index);    
+    const indexValue = this.addressToValue(index);
     const size = this.heap.getInt32(array * WORD_SIZE + 4);
     if (indexValue >= size) {
       throw new Error("Index out of bounds");
@@ -642,7 +647,7 @@ export class Heap {
       throw new Error("Index is not a number");
     }
 
-    const indexValue = this.addressToValue(index);    
+    const indexValue = this.addressToValue(index);
     const size = this.heap.getInt32(array * WORD_SIZE + 4);
     if (indexValue >= size) {
       throw new Error("Index out of bounds");
@@ -762,7 +767,7 @@ export class Heap {
     }
 
     const addr = this.allocate(Tag.STRING, 0);
-    
+
     // add the string to the string pool
     this.stringPool[hash] = [addr, str];
 
@@ -866,14 +871,14 @@ export class Heap {
       throw new Error("Not an environment");
     }
     let [frameIndex, bindingIndex] = index;
-    
+
     // we must calculate the correct position from the index
     const nodesAway = Math.floor(frameIndex / 8);
     const offset = frameIndex % 8;
-    
+
     // traverse <nodesAway> nodes away from the frame
     let working = env;
-    
+
     for (let i = 0; i < nodesAway; i++) {
       if (!(this.isExtension(working) || this.isEnvironment(working))) {
         throw new Error("Not an environment");
@@ -894,14 +899,14 @@ export class Heap {
       throw new Error("Not an environment");
     }
     let [frameIndex, bindingIndex] = index;
-    
+
     // we must calculate the correct position from the index
     const nodesAway = Math.floor(frameIndex / 8);
     const offset = frameIndex % 8;
-    
+
     // traverse <nodesAway> nodes away from the frame
     let working = env;
-    
+
     for (let i = 0; i < nodesAway; i++) {
       if (!(this.isExtension(working) || this.isEnvironment(working))) {
         throw new Error("Not an environment");
@@ -935,7 +940,7 @@ export class Heap {
 
     // traverse <nodesAway> nodes away from the frame
     let working = frame;
-    
+
     for (let i = 0; i < nodesAway; i++) {
       if (!(this.isExtension(working) || this.isFrame(working))) {
         throw new Error("Not a frame");
@@ -958,7 +963,7 @@ export class Heap {
     const offset = index % 8;
     // traverse <nodesAway> nodes away from the frame
     let working = frame;
-    
+
     for (let i = 0; i < nodesAway; i++) {
       if (!(this.isExtension(working) || this.isFrame(working))) {
         throw new Error("Not a frame");
@@ -1090,14 +1095,12 @@ export class Heap {
     const buf = new ArrayBuffer(8);
     const view = new DataView(buf);
     view.setFloat64(0, word);
-    let binStr = '';
+    let binStr = "";
     for (let i = 0; i < 8; i++) {
-        binStr += ('00000000' +
-                   view.getUint8(i).toString(2)).slice(-8) +
-                   ' ';
+      binStr += ("00000000" + view.getUint8(i).toString(2)).slice(-8) + " ";
     }
-    return binStr
-  }
+    return binStr;
+  };
 
   typeOfTag(tag: Tag): string {
     switch (tag) {

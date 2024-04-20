@@ -18,7 +18,12 @@ export class Goroutine {
   // A transitionary field for addresses that are required but are in "transit"
   private working: number[] = [];
 
-  constructor(programCounter: number, runner: Runner, inst:instr.Instr[], environment: number) {
+  constructor(
+    programCounter: number,
+    runner: Runner,
+    inst: instr.Instr[],
+    environment: number,
+  ) {
     this.runner = runner;
     this.instructions = inst;
     this.runtimeStack = new Stack();
@@ -39,7 +44,7 @@ export class Goroutine {
   isRunnable() {
     return !this.done && !this.blocked;
   }
- 
+
   // scan the waitingOn list and see if any of the channels are free
   waitingChannelIsFree(): boolean {
     for (let i = 0; i < this.waitingOn.length; i++) {
@@ -70,7 +75,10 @@ export class Goroutine {
       case instr.InstrType.UNOP:
         const operand = this.operandStack.pop();
         this.working.push(operand);
-        const unopRes = this.performUnOpcode((i as instr.UNOPInstr).op, operand);
+        const unopRes = this.performUnOpcode(
+          (i as instr.UNOPInstr).op,
+          operand,
+        );
         this.operandStack.push(unopRes);
         this.working.pop();
         this.programCounter++;
@@ -80,7 +88,11 @@ export class Goroutine {
         const left = this.operandStack.pop();
         this.working.push(left);
         this.working.push(right);
-        const binopRes = this.performBinOpcode((i as instr.BINOPInstr).op, left, right);
+        const binopRes = this.performBinOpcode(
+          (i as instr.BINOPInstr).op,
+          left,
+          right,
+        );
         this.operandStack.push(binopRes);
         this.working.pop();
         this.working.pop();
@@ -108,9 +120,14 @@ export class Goroutine {
         this.working.push(blockFrame);
         this.runtimeStack.push(blockFrame);
         // console.log("allocating frame with", (i as instr.ENTER_SCOPEInstr).syms, "symbols");
-        const newFrame = this.heap.allocateFrame((i as instr.ENTER_SCOPEInstr).syms);
+        const newFrame = this.heap.allocateFrame(
+          (i as instr.ENTER_SCOPEInstr).syms,
+        );
         this.working.push(newFrame);
-        this.environment = this.heap.extendEnvironment(this.environment, newFrame);
+        this.environment = this.heap.extendEnvironment(
+          this.environment,
+          newFrame,
+        );
         this.working.pop();
         this.working.pop();
         str += " to " + this.environment;
@@ -124,7 +141,10 @@ export class Goroutine {
         this.programCounter++;
         break;
       case instr.InstrType.LD:
-        const value = this.heap.getEnvironmentValue(this.environment, (i as instr.LDInstr).pos);
+        const value = this.heap.getEnvironmentValue(
+          this.environment,
+          (i as instr.LDInstr).pos,
+        );
         if (this.heap.isUnallocated(value)) {
           throw new Error("Unallocated value");
         }
@@ -134,15 +154,20 @@ export class Goroutine {
       case instr.InstrType.ASSIGN:
         const assignValue = this.operandStack.pop();
         // console.log("assigning ", assignValue, " to ", (i as instr.ASSIGNInstr).name, "with position ", (i as instr.ASSIGNInstr).pos);
-        this.heap.setEnvironmentValue(this.environment, (i as instr.ASSIGNInstr).pos, assignValue);
+        this.heap.setEnvironmentValue(
+          this.environment,
+          (i as instr.ASSIGNInstr).pos,
+          assignValue,
+        );
         this.programCounter++;
         break;
       case instr.InstrType.LDF:
         // make a closure
         const closure = this.heap.allocateClosure(
-          (i as instr.LDFInstr).arity, 
-          (i as instr.LDFInstr).addr, 
-          this.environment);
+          (i as instr.LDFInstr).arity,
+          (i as instr.LDFInstr).addr,
+          this.environment,
+        );
         this.operandStack.push(closure);
         this.programCounter++;
         break;
@@ -154,12 +179,12 @@ export class Goroutine {
         for (let i = arity - 1; i >= 0; i--) {
           args[i] = this.operandStack.pop();
         }
-        
+
         const fn = this.operandStack.pop();
 
         // add all the items to the working list
         this.working = this.working.concat(args);
-        
+
         if (this.heap.isBuiltin(fn)) {
           // console.log("builtin function")
           // put the arguments back on the stack
@@ -183,10 +208,13 @@ export class Goroutine {
         if (!this.heap.isClosure(fn)) {
           throw new Error("Expected a closure");
         }
-        
+
         if (i.type === instr.InstrType.CALL) {
           // push onto runtime stack
-          const callFrame = this.heap.allocateCallFrame(this.environment, this.programCounter + 1);
+          const callFrame = this.heap.allocateCallFrame(
+            this.environment,
+            this.programCounter + 1,
+          );
           this.runtimeStack.push(callFrame);
         }
 
@@ -196,7 +224,10 @@ export class Goroutine {
           this.heap.setFrameValue(parameterFrame, i, args[i]);
         }
 
-        this.environment = this.heap.extendEnvironment(this.heap.getClosureEnv(fn), parameterFrame);
+        this.environment = this.heap.extendEnvironment(
+          this.heap.getClosureEnv(fn),
+          parameterFrame,
+        );
         this.programCounter = this.heap.getClosurePC(fn);
 
         // now remove everything from the working list
@@ -219,96 +250,99 @@ export class Goroutine {
         break;
       case instr.InstrType.SEND:
         {
-        const val = this.operandStack.pop();
-        const chan = this.operandStack.pop();
-        
-        this.working = this.working.concat([val, chan]);
+          const val = this.operandStack.pop();
+          const chan = this.operandStack.pop();
 
-        if (!this.heap.isChan(chan)) {
-          throw new Error("Expected a channel");
-        }
-        
-        if (this.heap.channelIsFull(chan)) {
-          // put the value and channel back on the stack
-          this.operandStack.push(chan);
-          this.operandStack.push(val);
+          this.working = this.working.concat([val, chan]);
 
-          this.blocked = true;
+          if (!this.heap.isChan(chan)) {
+            throw new Error("Expected a channel");
+          }
 
-          this.waitingOn.push(this.heap.allocateWaitSend(chan));
-          this.working.pop();
-          this.working.pop();
-          this.runner.cycleNext();
-          return;
-        }
-        this.heap.channelPushItem(chan, val);
-        this.programCounter++;
-        this.working.pop();
-        this.working.pop();
-        }
-        break;
-      case instr.InstrType.RECEIVE: {
-        const chan = this.operandStack.pop();
-        this.working.push(chan);
-        
-        if (!this.heap.isChan(chan)) {
-          throw new Error("Expected a channel");
-        }
-        
-        if (this.heap.channelIsEmpty(chan)) {
-          // put the channel back on the stack
-          this.operandStack.push(chan);
+          if (this.heap.channelIsFull(chan)) {
+            // put the value and channel back on the stack
+            this.operandStack.push(chan);
+            this.operandStack.push(val);
 
-          this.blocked = true;
-          this.waitingOn.push(this.heap.allocateWaitReceive(chan));
-          this.runner.cycleNext();
-          this.working.pop();
-          break;
-        }
-        const val = this.heap.channelPopItem(chan);
-        this.working.pop();
-        this.operandStack.push(val);
-        this.programCounter++;
-      }
-        break;
-      case instr.InstrType.SOF: {
-        const val = this.operandStack.pop();
-        const chan = this.operandStack.pop();
-        this.working.concat([val, chan]);
-        if (this.heap.channelIsFull(chan)) {
-          // console.log("channel is full, failing send");
-          // the send fails
-          // jump to the specified address
-          this.programCounter = (i as instr.SOFInstr).addr;
-          // and add the channel to the list of channels we are waiting on
-          this.waitingOn.push(this.heap.allocateWaitSend(chan));
-        } else {
-          // send the value
+            this.blocked = true;
+
+            this.waitingOn.push(this.heap.allocateWaitSend(chan));
+            this.working.pop();
+            this.working.pop();
+            this.runner.cycleNext();
+            return;
+          }
           this.heap.channelPushItem(chan, val);
           this.programCounter++;
+          this.working.pop();
+          this.working.pop();
         }
-        this.working.pop();
-        this.working.pop();
-      }
         break;
-      case instr.InstrType.ROF: {
-        const chan = this.operandStack.pop();
-        this.working.push(chan);
-        if (this.heap.channelIsEmpty(chan)) {
-          // console.log("channel is empty, failing receive");
-          // the receive fails
-          // jump to the specified address
-          this.programCounter = (i as instr.ROFInstr).addr;
-          // and add the channel to the list of channels we are waiting on
-          this.waitingOn.push(this.heap.allocateWaitReceive(chan));
-        } else {
-          // receive the value
+      case instr.InstrType.RECEIVE:
+        {
+          const chan = this.operandStack.pop();
+          this.working.push(chan);
+
+          if (!this.heap.isChan(chan)) {
+            throw new Error("Expected a channel");
+          }
+
+          if (this.heap.channelIsEmpty(chan)) {
+            // put the channel back on the stack
+            this.operandStack.push(chan);
+
+            this.blocked = true;
+            this.waitingOn.push(this.heap.allocateWaitReceive(chan));
+            this.runner.cycleNext();
+            this.working.pop();
+            break;
+          }
           const val = this.heap.channelPopItem(chan);
+          this.working.pop();
           this.operandStack.push(val);
           this.programCounter++;
         }
-        this.working.pop();
-      }
+        break;
+      case instr.InstrType.SOF:
+        {
+          const val = this.operandStack.pop();
+          const chan = this.operandStack.pop();
+          this.working.concat([val, chan]);
+          if (this.heap.channelIsFull(chan)) {
+            // console.log("channel is full, failing send");
+            // the send fails
+            // jump to the specified address
+            this.programCounter = (i as instr.SOFInstr).addr;
+            // and add the channel to the list of channels we are waiting on
+            this.waitingOn.push(this.heap.allocateWaitSend(chan));
+          } else {
+            // send the value
+            this.heap.channelPushItem(chan, val);
+            this.programCounter++;
+          }
+          this.working.pop();
+          this.working.pop();
+        }
+        break;
+      case instr.InstrType.ROF:
+        {
+          const chan = this.operandStack.pop();
+          this.working.push(chan);
+          if (this.heap.channelIsEmpty(chan)) {
+            // console.log("channel is empty, failing receive");
+            // the receive fails
+            // jump to the specified address
+            this.programCounter = (i as instr.ROFInstr).addr;
+            // and add the channel to the list of channels we are waiting on
+            this.waitingOn.push(this.heap.allocateWaitReceive(chan));
+          } else {
+            // receive the value
+            const val = this.heap.channelPopItem(chan);
+            this.operandStack.push(val);
+            this.programCounter++;
+          }
+          this.working.pop();
+        }
         break;
       case instr.InstrType.BLOCK:
         // block this goroutine
@@ -391,7 +425,7 @@ export class Goroutine {
         case instr.BinopType.LE:
           return left <= right;
         case instr.BinopType.GE:
-          return left >= right
+          return left >= right;
       }
     }
     return this.heap.valueToAddress(rawPerformBinOpcode(op, left, right));
