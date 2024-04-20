@@ -1,0 +1,12 @@
+func main() {
+  func inner() {
+    const x number = 3;
+    return x;
+  }
+
+  display(inner());
+}
+
+func test() {
+  inner(); // fails
+}
