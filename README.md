@@ -1,4 +1,4 @@
-# js-slang
+# go-slang
 
 An implementation of a subset of the language _Go_, created for CS4215 term project for AY23/24 Semester 2
 
@@ -6,15 +6,7 @@ An implementation of a subset of the language _Go_, created for CS4215 term proj
 
 - [Prerequisites](#prerequisites)
 - [Usage](#usage)
-- [Documentation](#documentation)
-- [Requirements](#requirements)
 - [Testing](#testing)
-- [Error messages](#error-messages)
-- [Using your js-slang in Source Academy](#using-your-js-slang-in-source-academy)
-- [Using your js-slang in your local Source Academy](#using-your-js-slang-in-your-local-source-academy)
-- [Building and publishing SICP package](#building-and-publishing-sicp-package)
-- [Talks and Presentations](#talks-and-presentations)
-- [License](#license)
 
 ## Prerequisites
 
