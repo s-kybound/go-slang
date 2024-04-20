@@ -1,0 +1,6 @@
+func main() {
+  c := make_channel();
+  c <- 1;
+  c <- 2;
+  return;
+}

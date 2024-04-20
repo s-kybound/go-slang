@@ -6,6 +6,7 @@
   "author": "s-kybound <abadkyriel@gmail.com>",
   "license": "MIT",
   "scripts": {
+    "build": "tsc",
     "test": "jest",
     "eslint": "eslint --ignore-path .eslintignore --ext .ts",
     "format": "prettier --ignore-path .prettierignore --write \"**/*.+(js|ts|json)\""

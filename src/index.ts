@@ -84,7 +84,14 @@ const size = argv.s as number;
 const inBytes = argv.inBytes as boolean;
 const debug = argv.debug as boolean;
 
-const program = fs.readFileSync(file, "utf8");
+let program: string;
+try {
+  program = fs.readFileSync(file, "utf8");
+} catch (e) {
+  console.error(e);
+  console.log("File error: Please check the file path and try again.");
+  process.exit(1);
+}
 
 compile_and_run(program, quantum, size, inBytes, debug).catch((e) => {
   console.error(e);

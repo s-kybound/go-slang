@@ -31,6 +31,7 @@ export class Runner {
     withBytes: boolean = false,
     debug: boolean = false,
   ) {
+    this.goroutines = [];
     this.debug = debug;
     this.instructions = instructions;
     this.quantum = quantum;
@@ -45,7 +46,7 @@ export class Runner {
       this.programEnvironment,
       debug,
     );
-    this.goroutines = [this.mainGoroutine];
+    this.goroutines.push(this.mainGoroutine);
     this.currGoroutine = 0;
   }
 
