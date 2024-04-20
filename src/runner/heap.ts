@@ -381,7 +381,7 @@ export class Heap {
         // if the first node is unmarked, we free it.
         this.free(current);
         if (this.debug) {
-          console.log("Freeing", current);
+          console.error("Freeing", current);
         }
       }
       // unmark this node

@@ -129,7 +129,7 @@ export class Runner {
 
     string += this.currGoroutine;
     if (this.debug) {
-      console.log(string);
+      console.error(string);
     }
     // reset the time to 0
     this.time = 0;
