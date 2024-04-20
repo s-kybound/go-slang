@@ -1,0 +1,10 @@
+func main() {
+  if x := 1; true {
+    display(x);
+    display("true");
+  } else {
+    display(x);
+    display("false");
+  }
+  return;
+}
