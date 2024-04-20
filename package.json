@@ -22,5 +22,9 @@
     "eslint-plugin-promise": "^6.0.0",
     "prettier": "^3.2.5",
     "typescript": "^5.4.2"
+  },
+  "dependencies": {
+    "@types/yargs": "^17.0.32",
+    "yargs": "^17.7.2"
   }
 }

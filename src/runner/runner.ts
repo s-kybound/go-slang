@@ -15,6 +15,9 @@ export class Runner {
   // quantum of time to run each goroutine.
   private readonly quantum: number;
 
+  // whether to print debug information to the console.
+  private debug: boolean = false;
+
   /**
    *
    * @param instructions the compiled instructions for the program.
@@ -26,18 +29,21 @@ export class Runner {
     quantum: number,
     size: number,
     withBytes: boolean = false,
+    debug: boolean = false,
   ) {
+    this.debug = debug;
     this.instructions = instructions;
     this.quantum = quantum;
     this.heap = withBytes
-      ? Heap.createWithBytes(size, this)
-      : Heap.create(size, this);
+      ? Heap.createWithBytes(size, this, debug)
+      : Heap.create(size, this, debug);
     this.programEnvironment = this.heap.globalEnv;
     this.mainGoroutine = new Goroutine(
       0,
       this,
       this.instructions,
       this.programEnvironment,
+      debug,
     );
     this.goroutines = [this.mainGoroutine];
     this.currGoroutine = 0;
@@ -122,7 +128,9 @@ export class Runner {
       });
 
     string += this.currGoroutine;
-    // console.log(string);
+    if (this.debug) {
+      console.log(string);
+    }
     // reset the time to 0
     this.time = 0;
   }

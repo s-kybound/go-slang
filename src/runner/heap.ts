@@ -98,15 +98,19 @@ export class Heap {
   // for example, this is used to protect the global environment while it is being constructed.
   private working: number[] = [];
 
+  // debugging flag
+  private debug: boolean;
+
   // constructor for the heap.
   // remember that the size is given in bytes.
-  private constructor(size: number, runner: Runner) {
+  private constructor(size: number, runner: Runner, debug: boolean = false) {
     if (size < NODE_SIZE * WORD_SIZE) {
       const min = NODE_SIZE * WORD_SIZE;
       throw new Error(
         `Heap size too small - please allocate more initial memory (at least ${min} bytes).`,
       );
     }
+    this.debug = debug;
     this.runner = runner;
     this.freePointer = 0;
     this.heap = new DataView(new ArrayBuffer(size));
@@ -146,13 +150,13 @@ export class Heap {
   }
 
   // create a new heap with a size given in megabytes.
-  static create(size: number, runner: Runner): Heap {
+  static create(size: number, runner: Runner, debug: boolean): Heap {
     return new Heap(size * MEGABYTE, runner);
   }
 
   // create a new heap with a size given in bytes.
   // we can use this to test GC with smaller heaps.
-  static createWithBytes(size: number, runner: Runner): Heap {
+  static createWithBytes(size: number, runner: Runner, debug: boolean): Heap {
     return new Heap(size, runner);
   }
 
@@ -285,8 +289,15 @@ export class Heap {
     // get the new size
     const newSize = oldSize * 2;
 
-    console.error("Resizing heap from", oldSize, "bytes to", newSize, "bytes");
-
+    if (this.debug) {
+      console.error(
+        "Resizing heap from",
+        oldSize,
+        "bytes to",
+        newSize,
+        "bytes",
+      );
+    }
     // create a new heap
     const newHeap = new DataView(new ArrayBuffer(newSize));
     const oldAllocableSize = oldSize - (oldSize % (NODE_SIZE * WORD_SIZE));
@@ -369,7 +380,9 @@ export class Heap {
         }
         // if the first node is unmarked, we free it.
         this.free(current);
-        //console.log("Freeing", current);
+        if (this.debug) {
+          console.log("Freeing", current);
+        }
       }
       // unmark this node
       this.unmark(current);
@@ -379,7 +392,9 @@ export class Heap {
   }
 
   garbageCollect() {
-    console.error("Garbage collecting");
+    if (this.debug) {
+      console.error("Garbage collecting");
+    }
     // mark and sweep algorithm
     // mark all of the literals
     this.mark(this.False);

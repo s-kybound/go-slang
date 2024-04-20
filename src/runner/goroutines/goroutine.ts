@@ -15,6 +15,8 @@ export class Goroutine {
   private done: boolean = false;
   private blocked: boolean = false;
 
+  private debug: boolean = false;
+
   // A transitionary field for addresses that are required but are in "transit"
   private working: number[] = [];
 
@@ -23,7 +25,9 @@ export class Goroutine {
     runner: Runner,
     inst: instr.Instr[],
     environment: number,
+    debug: boolean = false,
   ) {
+    this.debug = debug;
     this.runner = runner;
     this.instructions = inst;
     this.runtimeStack = new Stack();
@@ -264,7 +268,7 @@ export class Goroutine {
             this.operandStack.push(chan);
             this.operandStack.push(val);
 
-            this.blocked = true;
+            this.block();
 
             this.waitingOn.push(this.heap.allocateWaitSend(chan));
             this.working.pop();
@@ -291,7 +295,7 @@ export class Goroutine {
             // put the channel back on the stack
             this.operandStack.push(chan);
 
-            this.blocked = true;
+            this.block();
             this.waitingOn.push(this.heap.allocateWaitReceive(chan));
             this.runner.cycleNext();
             this.working.pop();
@@ -346,7 +350,7 @@ export class Goroutine {
         break;
       case instr.InstrType.BLOCK:
         // block this goroutine
-        this.blocked = true;
+        this.block();
         // signal the runner to get a new goroutine
         this.runner.cycleNext();
         this.programCounter++;
@@ -460,8 +464,18 @@ export class Goroutine {
   }
 
   unblock() {
+    if (this.debug) {
+      console.error("Unblocking goroutine");
+    }
     this.waitingOn = [];
     this.blocked = false;
+  }
+
+  block() {
+    if (this.debug) {
+      console.error("Blocking goroutine");
+    }
+    this.blocked = true;
   }
 
   mark() {
