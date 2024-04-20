@@ -151,13 +151,13 @@ export class Heap {
 
   // create a new heap with a size given in megabytes.
   static create(size: number, runner: Runner, debug: boolean): Heap {
-    return new Heap(size * MEGABYTE, runner);
+    return new Heap(size * MEGABYTE, runner, debug);
   }
 
   // create a new heap with a size given in bytes.
   // we can use this to test GC with smaller heaps.
   static createWithBytes(size: number, runner: Runner, debug: boolean): Heap {
-    return new Heap(size, runner);
+    return new Heap(size, runner, debug);
   }
 
   private initGlobalEnvironment(): number {

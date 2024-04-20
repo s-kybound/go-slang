@@ -1,30 +1,30 @@
 func fibonacci(c, quit chan int) {
-	x, y := 0, 1
-	for {
+	x, y := 0, 1;
+	for ;;{
 		select {
 		case c <- x:
-			x, y = y, x+y
-		case <-quit:
-			display("quit")
-			return 0
+			x, y = y, x+y;
+		case <- quit:
+			display("quit");
+			return 0;
 		}
 	}
 }
 
 func main() {
-	display("Hello, World!")
-	c := make_channel()
-	quit := make_channel()
-	// this is treated as a daemon goroutine that
-	// waits on channel c to display the fibonacci numbers
+	display("Hello, World!");
+	c := make_channel();
+	quit := make_channel();
+  // this is treated as a daemon goroutine that
+  // waits on channel c to display the fibonacci numbers
 	go func() {
 		for i := 0; i < 10; i = i + 1 {
-			// this is a blocking operation
-			// it will wait for the main goroutine to send a value
-			// in fibonacci
-			display(<-c)
+      // this is a blocking operation
+      // it will wait for the main goroutine to send a value
+      // in fibonacci
+      display(<-c);
 		}
-		quit <- 0
-	}()
-	fibonacci(c, quit)
+		quit <- 0;
+	}();
+	fibonacci(c, quit);
 }

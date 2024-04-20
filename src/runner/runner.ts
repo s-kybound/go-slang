@@ -16,7 +16,7 @@ export class Runner {
   private readonly quantum: number;
 
   // whether to print debug information to the console.
-  private debug: boolean = false;
+  private debug: boolean;
 
   /**
    *
@@ -28,8 +28,8 @@ export class Runner {
     instructions: instr.Instr[],
     quantum: number,
     size: number,
-    withBytes: boolean = false,
-    debug: boolean = false,
+    withBytes: boolean,
+    debug: boolean,
   ) {
     this.goroutines = [];
     this.debug = debug;
@@ -71,12 +71,14 @@ export class Runner {
   // a round robin scheduler that cycles through the goroutines.
   // if a goroutine is blocked, it will check if it can be unblocked.
   cycleNext() {
-    let string = "context switching from: " + this.currGoroutine + " to ";
+    const oldGoroutine = this.currGoroutine;
+    let string = "context switching from: " + oldGoroutine + " to ";
     // we will cycle through the goroutine ring once, finding the next runnable goroutine,
     // and cleaning up any goroutines that are done.
     let currLength = this.goroutines.length;
     let toClean: number[] = [];
     let foundGoroutine = false;
+    let newGoroutine;
     for (let i = 0; i < currLength; i++) {
       // get the next goroutine
       const goroutineToCheck =
@@ -103,20 +105,23 @@ export class Runner {
         if (this.goroutines[goroutineToCheck].waitingChannelIsFree()) {
           this.goroutines[goroutineToCheck].unblock();
           foundGoroutine = true;
-          this.currGoroutine = goroutineToCheck;
+          newGoroutine = goroutineToCheck;
         }
         continue;
       }
 
       // Otherwise, we have landed on a runnable goroutine.
       foundGoroutine = true;
-      this.currGoroutine = goroutineToCheck;
+      newGoroutine = goroutineToCheck;
     }
     // if we have not found a runnable goroutine by the end of the loop,
     // we know we are deadlocked
     if (!foundGoroutine) {
       throw new Error("Deadlock detected: all goroutines are blocked.");
     }
+
+    // update the current goroutine index
+    this.currGoroutine = newGoroutine as number;
 
     // clean up goroutines marked as done in reverse order and adjust the nextGoroutine index
     toClean
@@ -128,8 +133,8 @@ export class Runner {
         }
       });
 
-    string += this.currGoroutine;
-    if (this.debug) {
+    string += newGoroutine;
+    if (this.debug && oldGoroutine !== newGoroutine) {
       console.error(string);
     }
     // reset the time to 0

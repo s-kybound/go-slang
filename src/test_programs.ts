@@ -24,6 +24,6 @@ const instructions = compiler.getInstrs();
 const QUANTUM = 22;
 
 // select a runner to run the program
-const runner = new Runner(instructions, QUANTUM, 8000, true);
+const runner = new Runner(instructions, QUANTUM, 8000, true, true);
 
 runner.run();
