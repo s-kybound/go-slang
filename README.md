@@ -6,6 +6,7 @@
 - [Prerequisites](#prerequisites)
 - [Usage](#usage)
 - [Testing](#testing)
+- [Current Issues](#current-issues)
 
 ## About
 
@@ -13,6 +14,7 @@ An implementation of a subset of the language _Go_, created for CS4215 term proj
 
 Currently, our implementation exhibits the following features:
 
+- Realistic Virtual Machine with heap and instruction compiler
 - Concurrent execution achieved with timeslicing
 - Synchronization primitives with unbuffered channels
 - Support for select-case statement
@@ -87,3 +89,7 @@ Several example programs are left in the `examples` folder. Give them a try!
 
 _go-slang_ is able to resize its heap during runtime, if garbage collection fails to free memory. However, starting a program with too little
 memory may impact the correctness of _go-slang_ in program execution. (for example, `example/fibonacci.goslang` fails to execute properly with less than 4320 bytes) While we prevent you from allocating less than 80 bytes (the size of a single node), do be careful with the number of bytes allocated to your program!
+
+### Data types
+
+There are only 3 primitive data types, `number`, `string`, and `bool`. Currently, _go-slang_ represents all numbers with the `number` type. Arrays and Channels can be used, but only with the `make_array()` and `make_channel()` builtin - they cannot be initialized directly by the user. The parser and heap support Slice and Struct data types, but these are unsupported by our current instruction set.
