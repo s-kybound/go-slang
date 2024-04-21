@@ -3,6 +3,7 @@
 // it is also used to keep track of the types of function arguments and return types.
 
 import * as ast_nodes from "../go-slang-parser/src/parser_mapper/ast_types";
+import { stdlib, constants, Stdlib } from "../stdlib";
 
 function isCustomType(type: ast_nodes.Type): type is ast_nodes.CustomType {
   return type instanceof ast_nodes.CustomType;
@@ -33,7 +34,18 @@ export class TypeEnvironment {
 
   // Creates a new type environment for the base scope.
   public static createBaseTypeEnvironment(): TypeEnvironment {
-    return new TypeEnvironment();
+    const env = new TypeEnvironment();
+    for (const key in stdlib) {
+      const val = stdlib[key as keyof Stdlib];
+      const valType = val[2];
+      env.nameMap.set(key, null);
+      env.identifierMap.set(key, valType);
+    }
+    for (const key in stdlib) {
+      env.nameMap.set(key, null);
+      env.identifierMap.set(key, new ast_nodes.AnyType());
+    }
+    return env;
   }
 
   // Creates a new type environment for a child scope.

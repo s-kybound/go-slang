@@ -1,3 +1,4 @@
+import { Type } from "../go-slang-parser/src/parser_mapper/ast_types";
 import { stdlib, constants, Stdlib, Constants } from "../stdlib";
 import { Runner } from "./runner";
 
@@ -88,7 +89,7 @@ export class Heap {
   globalEnv: number;
 
   // set of builtins, represented with [arity, function]
-  builtins: [number, Function][] = [];
+  builtins: [number, Function, Type][] = [];
 
   // the runner that the heap is associated with
   private runner: Runner;

@@ -94,6 +94,10 @@ export class GoTypeChecker {
         te,
       );
 
+      if (operatorType instanceof ast_nodes.AnyType) {
+        return operatorType;
+      }
+
       if (operatorType instanceof ast_nodes.FunctionType) {
         const funcType = operatorType as ast_nodes.FunctionType;
         // the formals value might be null, a single type or a tuple type.
@@ -442,6 +446,10 @@ export class GoTypeChecker {
         te,
       ) as ast_nodes.ChanType;
 
+      if (chan instanceof ast_nodes.AnyType) {
+        return chan;
+      }
+
       // the channel must be a channel
       if (!(chan instanceof ast_nodes.ChanType)) {
         this.errors.push(`Send statement channel must be of type channel`);
@@ -479,6 +487,10 @@ export class GoTypeChecker {
         te,
       ) as ast_nodes.ChanType;
 
+      if (chan instanceof ast_nodes.AnyType) {
+        return chan;
+      }
+
       // the channel must be a channel
       if (!(chan instanceof ast_nodes.ChanType)) {
         this.errors.push(`Receive expression channel must be of type channel`);
@@ -501,6 +513,10 @@ export class GoTypeChecker {
         node.accessed,
         te,
       );
+
+      if (accessed instanceof ast_nodes.AnyType) {
+        return accessed;
+      }
 
       // the accessed must be an array or slice
       if (

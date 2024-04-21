@@ -1,7 +1,8 @@
+import * as node from "./go-slang-parser/src/parser_mapper/ast_types";
 import { Goroutine } from "./runner/goroutines/goroutine";
 
 export interface Stdlib {
-  [key: string]: [number, (g: Goroutine) => any];
+  [key: string]: [number, (g: Goroutine) => any, node.Type];
 }
 
 export const stdlib: Stdlib = {
@@ -12,6 +13,7 @@ export const stdlib: Stdlib = {
       console.log(g.heap.addressToValue(addr));
       return addr;
     },
+    new node.AnyType(),
   ],
 
   display_address: [
@@ -21,6 +23,7 @@ export const stdlib: Stdlib = {
       console.log(addr);
       return addr;
     },
+    new node.AnyType(),
   ],
 
   make_channel: [
@@ -29,6 +32,7 @@ export const stdlib: Stdlib = {
       const channel = g.heap.allocateChannel();
       return channel;
     },
+    new node.AnyType(),
   ],
 
   make_array: [
@@ -39,6 +43,7 @@ export const stdlib: Stdlib = {
       const array = g.heap.allocateArray(sizeValue);
       return array;
     },
+    new node.AnyType(),
   ],
 
   is_number: [
@@ -47,6 +52,7 @@ export const stdlib: Stdlib = {
       const addr = g.operandStack.pop();
       return g.heap.valueToAddress(g.heap.isNumber(addr));
     },
+    new node.AnyType(),
   ],
 
   is_boolean: [
@@ -55,6 +61,7 @@ export const stdlib: Stdlib = {
       const addr = g.operandStack.pop();
       return g.heap.valueToAddress(g.heap.isBoolean(addr));
     },
+    new node.AnyType(),
   ],
 
   is_string: [
@@ -63,6 +70,7 @@ export const stdlib: Stdlib = {
       const addr = g.operandStack.pop();
       return g.heap.valueToAddress(g.heap.isString(addr));
     },
+    new node.AnyType(),
   ],
 
   is_undefined: [
@@ -71,6 +79,7 @@ export const stdlib: Stdlib = {
       const addr = g.operandStack.pop();
       return g.heap.valueToAddress(g.heap.isUndefined(addr));
     },
+    new node.AnyType(),
   ],
 
   is_function: [
@@ -79,6 +88,7 @@ export const stdlib: Stdlib = {
       const addr = g.operandStack.pop();
       return g.heap.valueToAddress(g.heap.isClosure(addr));
     },
+    new node.AnyType(),
   ],
 
   math_sqrt: [
@@ -88,6 +98,7 @@ export const stdlib: Stdlib = {
       const value = g.heap.addressToValue(addr);
       return g.heap.valueToAddress(Math.sqrt(value));
     },
+    new node.AnyType(),
   ],
 };
 
