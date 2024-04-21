@@ -7,6 +7,7 @@ import { GoCompiler } from "./compiler/compiler";
 import { Runner } from "./runner/runner";
 import { Program } from "./go-slang-parser/src/parser_mapper/ast_types";
 import { Instr } from "./compiler/instructions";
+import { GoTypeChecker } from "./type-checker/type_checker";
 
 export async function compile(program: string): Promise<Instr[]> {
   let ast: Program;
@@ -15,6 +16,15 @@ export async function compile(program: string): Promise<Instr[]> {
   } catch (e) {
     console.error(e);
     console.log("Parsing error: Please check your program and try again.");
+    throw e;
+  }
+
+  const typeChecker = new GoTypeChecker(ast);
+  try {
+    typeChecker.typeCheck();
+  } catch (e) {
+    console.error(e);
+    console.log("Type error: Please check your program and try again.");
     throw e;
   }
 

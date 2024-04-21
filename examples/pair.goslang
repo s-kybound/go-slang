@@ -1,0 +1,48 @@
+
+// an implementation of a cons cell,
+// along with cdr and car functions
+// implemented with HOF and closures
+
+// this is a HOF that returns an inner function,
+// that captures the values of car and cdr
+func cons(car, cdr number) func(bool) number {
+    return func(first bool) number {
+        if first {
+            return car;
+        } else {
+            return cdr;
+        }
+    };
+}
+
+// this is a HOF that takes in a function
+// calling the function
+func car(cons func(bool) number) number {
+    return cons(true);
+}
+
+// similar to above
+func cdr(cons func(bool) number) number {
+    return cons(false);
+}
+
+func main() {
+    first := 1;
+    second := 2;
+    // we construct a single pair - this is actually a function
+    myPair := cons(first, second);
+    
+    // wait... pair? is this Source Academy?
+    // if this is source academy, lets not use "car" and "cdr" - 
+    // we shall use "head" and "tail" instead!
+
+    // demonstrate that we can assign functions to identifiers
+    head := car;
+    tail := cdr;
+    
+    // now display the head and tail
+    display("this is the head");
+    display(head(myPair));
+    display("this is the tail");
+    display(tail(myPair));
+}
